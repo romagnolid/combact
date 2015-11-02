@@ -106,14 +106,17 @@ def SNP_coding(x,y,report_silent=False):
     y_codons = [y[i:i+3] for i in range(0, len(y)-3+1, 3)]
     for i in range(len(x_codons)):
         if x_codons[i] != y_codons[i]:
-            if i == 0:            
+            if i == 0:  
                 a = start_table.get(x_codons[i],"X")
                 b = start_table.get(y_codons[i],"X")
             else:            
                 a = codon_table.get(x_codons[i],"X")
                 b = codon_table.get(y_codons[i],"X")
+
             if a == b != "X" and report_silent: 
                 mutations.append("p.{}{}_SILENT".format(i+1, a))
+            elif a == b != "X" and not report_silent: 
+                mutations.append("_".format(i+1, a))
             elif b == "*":
                 mutations.append("p.{}{}>{}_NONSENSE".format(i+1, a, b))
             elif a != b or a == b == "X":

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 from __future__ import print_function, division
 from subprocess import call
 from Bio import SeqIO
@@ -14,59 +14,57 @@ def print_fasta(sequence,handle=None):
         print(sequence[i:i+80], file=handle)
         i += 80
 
-def write_igr(locations, record, handle=None):
-    """Write intergenic regions into an open file
-    """
-    if locations[0].strand == 1:
-        strand = "+"
-    else:
-        strand = "-"
-    i = 0
-    start = 0
-    while i < len(locations):
-        end = locations[i].start
-        if end - start > 0:
-            header = ">IGR:[{}:{}]({})|{}".format(start, end, strand, record.name)
-            seq = record.seq[start:end]
-            print(header,file=handle)
-            print_fasta(seq, handle)
-        start = locations[i].end
-        i += 1
-    end = len(record.seq)
-    if end - start > 0:
-        header = ">IGR:[{}:{}]({})|{}".format(start, end, strand, record.name)
-        seq = record.seq[start:end]
-        print(header,file=handle)
-        print_fasta(seq, handle)
-            
-def parse_gb_record(infilename,handle=None):
+def parse_gb_file(infilename,handle=None):
     """Read genebank file and convert it to a fasta file
     """
-    gb_records = SeqIO.parse(infilename,"gb")
-    genes_location_plus = []
-    genes_location_minus = []
-
-    for gb_record in gb_records:
-        for feature in gb_record.features:
-            if feature.type not in ("gene","source","variation"):
-                locus_tag = feature.qualifiers.get("locus_tag")
-                if locus_tag:
-                    header = ">{}:{}:{}".format(feature.type,feature.location,locus_tag[0])
-                else:
-                    header = ">{}:{}".format(feature.type,feature.location)
-                seq = feature.extract(gb_record.seq)
+    record = SeqIO.read(infilename,"gb")
+    start_p = 0
+    start_m = 0
+    for feature in record.features:
+        if feature.type in ("CDS","tRNA","rRNA") and feature.location.strand == 1:
+            end_p = feature.location.start
+            if end_p - start_p > 1:
+                header = ">IGR:[{}:{}](+)".format(start_p, end_p)
+                seq = record.seq[start_p:end_p]
                 print(header,file=handle)
                 print_fasta(seq, handle)
-                #db_xref = feature.qualifiers.get("db_xref",[])
-                #gene = feature.qualifiers.get("gene",[])
-                #product = feature.qualifiers.get("product",[])
-            elif feature.type == "gene" and feature.strand == 1:
-                genes_location_plus.append(feature.location)
-            elif feature.type == "gene" and feature.strand == -1:
-                genes_location_minus.append(feature.location)
-        
-        write_igr(genes_location_plus, gb_record, handle)
-        write_igr(genes_location_minus, gb_record, handle)
+
+            locus_tag = feature.qualifiers.get("locus_tag")
+            header = ">{}:{}:{}".format(feature.type,feature.location,locus_tag[0])
+            seq = feature.extract(record.seq)
+            print(header,file=handle)
+            print_fasta(seq, handle)
+            start_p = feature.location.end
+
+        elif feature.type in ("CDS","tRNA","rRNA") and feature.location.strand == -1:
+            end_m = feature.location.start
+            if end_m - start_m > 1:
+                header = ">IGR:[{}:{}](-)".format(start_m, end_m)
+                seq = record.seq[start_m:end_m]
+                print(header,file=handle)
+                print_fasta(seq, handle)
+
+            locus_tag = feature.qualifiers.get("locus_tag")
+            header = ">{}:{}:{}".format(feature.type,feature.location,locus_tag[0])
+            seq = feature.extract(record.seq)
+            print(header,file=handle)
+            print_fasta(seq, handle)
+            start_m = feature.location.end
+
+
+    end_p = record.features[0].location.end
+    if end_p - start_p > 1:
+        header = ">IGR:[{}:{}](+)".format(start_p, end_p)
+        seq = record.seq[start_p:end_p]
+        print(header,file=handle)
+        print_fasta(seq, handle)
+
+    end_m = record.features[0].location.end
+    if end_m - start_m > 1:
+        header = ">IGR:[{}:{}](-)".format(start_m, end_m)
+        seq = record.seq[start_m:end_m]
+        print(header,file=handle)
+        print_fasta(seq, handle)
 
 def concatenate_fasta(infilenames, handle=None):
     """ Concatenate several multifasta into a single multifasta
@@ -113,8 +111,9 @@ def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, le
                 q_seq = hsp.query
                 s_seq = hsp.sbjct
      
+                # short segment: possibly false positive
                 if identity < identity_cutoff or align_len/q_len*100 < length_cutoff:
-                    nucl_array[sbjct].append("non_functional")
+                    pass
                 
                 # wild-type
                 elif identity == 100 and q_len == align_len:
@@ -129,11 +128,8 @@ def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, le
                         coding = tools.SNP_coding(q_seq,s_seq)
 
                     # whether the gene codes for a protein or not
-                    if query.startswith("CDS") or "peg" in query:
-                        nucl_array[sbjct].append(non_coding+"$"+coding)
-                        amino_array[sbjct].append(coding)
-                    else:
-                        nucl_array[sbjct].append(non_coding)
+                    nucl_array[sbjct].append(non_coding+"$"+coding)
+                    amino_array[sbjct].append(coding)
     
                 # indel
                 elif q_start == 1 and q_end == q_len and gaps > 0:
