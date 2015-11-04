@@ -1,2 +1,0 @@
-strain1.fa Klebsiella_Pneumoniae_FI
-strain2.fa Klebsiella_Pneumoniae_SI

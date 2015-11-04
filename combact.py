@@ -1,12 +1,15 @@
 #!/usr/bin/env python
-from __future__ import print_function, division
-from subprocess import call
+from __future__ import print_function,division
 from Bio import SeqIO
 from Bio.Blast import NCBIXML
-from Bio.Blast.Applications import NcbiblastnCommandline
-from sys import exit
-import os.path
+from os.path import basename, splitext
 import tools
+
+class AlignmentError(Exception):
+    def __init__(self, value):
+        self.parameter = value
+    def __str__(self):
+        return repr(self.parameter)
 
 def print_fasta(sequence,handle=None):
     i = 0
@@ -73,22 +76,16 @@ def concatenate_fasta(infilenames, handle=None):
         raise TypeError("First argument must be iterable")
 
     for path in infilenames:
-        filename = os.path.splitext(os.path.basename(path))[0]
-        for seq_record in SeqIO.parse(path,"fasta"):
-            header = ">{}:{}".format(filename, seq_record.id)
+        filename = splitext(basename(path))[0]
+        records = SeqIO.parse(path,"fasta")
+        for i,seq_record in enumerate(records, 1):
+            header = ">{}|{}|{}".format(filename, seq_record.id, str(i))
             print(header,file=handle)
             print_fasta(seq_record.seq, handle)
 
-def makeblastdb(db_file):
-    call(["makeblastdb","-in", db_file,"-dbtype","nucl","-out", db_file.split(".")[0]])
-
-def blastn(query, db_file, out):
-    cline = NcbiblastnCommandline(query=query, db=db_file.split(".")[0], outfmt=5, out=out)
-    cline()
-
-def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, length_cutoff=70, identity_cutoff=80, with_silent=False):
+def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, identity_cutoff=80, length_cutoff=70, with_silent=False):
     sep="\t"
-    header = sep.join(["GeneID"]+inputlist)
+    header = sep.join(["GeneName"] + inputlist)
     print(header,file=handle_nucl)
     print(header,file=handle_amino)
 
@@ -96,23 +93,23 @@ def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, le
 
     for blast_record in blast_records:
         query = blast_record.query
-        q_len = int(blast_record.query_length)
+        q_len = blast_record.query_length
         nucl_array = dict(zip(inputlist, [[] for i in range(len(inputlist))]))
         amino_array = dict(zip(inputlist, [[] for i in range(len(inputlist))]))
         for alignment in blast_record.alignments:
-            sbjct = alignment.hit_def.split(":")[0]
+            sbjct = alignment.hit_def.split("|")[0]
     
             for hsp in alignment.hsps:
-                q_start = int(hsp.query_start)
-                q_end = int(hsp.query_end)
-                align_len = int(hsp.align_length)
-                identity = int(hsp.identities)/align_len*100
-                gaps = int(hsp.gaps)
+                q_start = hsp.query_start
+                q_end = hsp.query_end
+                align_len = hsp.align_length
+                identity = hsp.identities/align_len*100
+                gaps = hsp.gaps
                 q_seq = hsp.query
                 s_seq = hsp.sbjct
      
-                # short segment: possibly false positive
-                if identity < identity_cutoff or align_len/q_len*100 < length_cutoff:
+                # short segment: false positive
+                if identity <= identity_cutoff or align_len/q_len*100 <= length_cutoff:
                     pass
                 
                 # wild-type
@@ -120,7 +117,7 @@ def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, le
                     nucl_array[sbjct].append("WT")
     
                 # SNP
-                elif identity < 100 and q_len == align_len and gaps == 0:
+                elif identity < 100 and gaps == 0:
                     non_coding = tools.SNP_non_coding(q_seq,s_seq)
                     if with_silent:
                         coding = tools.SNP_coding(q_seq,s_seq,True)
@@ -136,7 +133,7 @@ def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, le
                     ins = tools.insertion(q_seq,s_seq)
                     dels = tools.deletion(q_seq,s_seq)
                     if len(ins)*len(dels) > 0: 
-                        indels = ins+";"+dels
+                        indels = ins + ";" + dels
                     else:
                         indels = ins + dels
                     nucl_array[sbjct].append(indels)
@@ -149,7 +146,7 @@ def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, le
     
                 # any unforseen mutation
                 else:
-                    exit("Unknown_mutation")
+                    raise AlignmentError("Unknown mutation type occuring between " + query + " and " + sbjct)
 
         print(sep.join([query]+["/".join(nucl_array[sbjct]) for sbjct in inputlist]),file=handle_nucl)
 
