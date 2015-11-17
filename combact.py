@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 from __future__ import print_function,division
 from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
 from Bio.Blast import NCBIXML
 from os.path import basename, splitext
+from sys import stdout
 import tools
 
 class AlignmentError(Exception):
@@ -11,77 +13,49 @@ class AlignmentError(Exception):
     def __str__(self):
         return repr(self.parameter)
 
-def print_fasta(sequence,handle=None):
-    i = 0
-    while i < len(sequence):
-        print(sequence[i:i+80], file=handle)
-        i += 80
-
-def parse_gb_file(infilename,handle=None):
-    """Read genebank file and convert it to a fasta file
+def parse_gb_file(infilename, handle_out=stdout):
+    """Read genebank file and convert it into a multifasta.
     """
     record = SeqIO.read(infilename,"gb")
-    start_p = 0
-    start_m = 0
+    sequences = []
+
+    start_igr = 0
     for feature in record.features:
-        if feature.type in ("CDS","tRNA","rRNA") and feature.location.strand == 1:
-            end_p = feature.location.start
-            if end_p - start_p > 1:
-                header = ">IGR:[{}:{}](+)".format(start_p, end_p)
-                seq = record.seq[start_p:end_p]
-                print(header,file=handle)
-                print_fasta(seq, handle)
+        if feature.type in ("CDS","tRNA","rRNA"):
+               end_igr = feature.location.start
+               if end_igr - start_igr > 1:
+                   seq_id = "IGR:[{}:{}]".format(start_igr, end_igr)
+                   seq = record.seq[start_igr:end_igr]
+                   sequences.append(SeqRecord(seq, id=seq_id, description="intergenic region"))
 
-            locus_tag = feature.qualifiers.get("locus_tag")
-            header = ">{}:{}:{}".format(feature.type,feature.location,locus_tag[0])
-            seq = feature.extract(record.seq)
-            print(header,file=handle)
-            print_fasta(seq, handle)
-            start_p = feature.location.end
+               locus_tag = feature.qualifiers["locus_tag"][0]
+               seq_desc = feature.qualifiers["product"][0]
+               seq_id = "{}:{}:{}".format(feature.type,feature.location,locus_tag)
+               seq = feature.extract(record.seq)
+               sequences.append(SeqRecord(seq,id=seq_id,description=seq_desc))
+               start_igr = feature.location.end
 
-        elif feature.type in ("CDS","tRNA","rRNA") and feature.location.strand == -1:
-            end_m = feature.location.start
-            if end_m - start_m > 1:
-                header = ">IGR:[{}:{}](-)".format(start_m, end_m)
-                seq = record.seq[start_m:end_m]
-                print(header,file=handle)
-                print_fasta(seq, handle)
+    end_igr = len(record.seq)
+    if end_igr - start_igr > 1:
+        seq_id = "IGR:[{}:{}]".format(start_igr, end_igr)
+        seq = record.seq[start_igr:end_igr]
+        sequences.append(SeqRecord(seq, id=seq_id, description="intergenic region"))
+    SeqIO.write(sequences, handle_out, "fasta")
 
-            locus_tag = feature.qualifiers.get("locus_tag")
-            header = ">{}:{}:{}".format(feature.type,feature.location,locus_tag[0])
-            seq = feature.extract(record.seq)
-            print(header,file=handle)
-            print_fasta(seq, handle)
-            start_m = feature.location.end
-
-
-    end_p = record.features[0].location.end
-    if end_p - start_p > 1:
-        header = ">IGR:[{}:{}](+)".format(start_p, end_p)
-        seq = record.seq[start_p:end_p]
-        print(header,file=handle)
-        print_fasta(seq, handle)
-
-    end_m = record.features[0].location.end
-    if end_m - start_m > 1:
-        header = ">IGR:[{}:{}](-)".format(start_m, end_m)
-        seq = record.seq[start_m:end_m]
-        print(header,file=handle)
-        print_fasta(seq, handle)
-
-def concatenate_fasta(infilenames, handle=None):
-    """ Concatenate several multifasta into a single multifasta
+def concatenate_fasta(infilenames, handle_out=stdout):
+    """Concatenate several fasta files into a single multifasta.
     """
     if not hasattr(infilenames,"__iter__"):
         raise TypeError("First argument must be iterable")
 
+    sequences = []
     for path in infilenames:
         filename = splitext(basename(path))[0]
         records = SeqIO.parse(path,"fasta")
-        for i,seq_record in enumerate(records, 1):
-            header = ">{}|{}|{}".format(filename, seq_record.id, str(i))
-            print(header,file=handle)
-            print_fasta(seq_record.seq, handle)
+        for i, seq_record in enumerate(records, 1):
+            seq_id = "{}|{}|{}".format(filename, seq_record.id, str(i))
+            sequences.append(SeqRecord(seq_record.seq, id=seq_id))
+    SeqIO.write(sequences, handle_out ,"fasta")
 
 def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, identity_cutoff=80, length_cutoff=70, with_silent=False):
     sep="\t"
