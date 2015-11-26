@@ -13,7 +13,7 @@ class AlignmentError(Exception):
     def __str__(self):
         return repr(self.parameter)
 
-def parse_gb_file(infilename, handle_out=stdout):
+def parse_gb_file(infilename, handle_out=stdout, add_igr=False):
     """Read genebank file and convert it into a multifasta.
     """
     record = SeqIO.read(infilename,"gb")
@@ -23,7 +23,7 @@ def parse_gb_file(infilename, handle_out=stdout):
     for feature in record.features:
         if feature.type in ("CDS","tRNA","rRNA"):
                end_igr = feature.location.start
-               if end_igr - start_igr > 1:
+               if end_igr - start_igr > 1 and add_igr:
                    seq_id = "IGR:[{}:{}]".format(start_igr, end_igr)
                    seq = record.seq[start_igr:end_igr]
                    sequences.append(SeqRecord(seq, id=seq_id, description="intergenic region"))
@@ -36,7 +36,7 @@ def parse_gb_file(infilename, handle_out=stdout):
                start_igr = feature.location.end
 
     end_igr = len(record.seq)
-    if end_igr - start_igr > 1:
+    if end_igr - start_igr > 1 and add_igr:
         seq_id = "IGR:[{}:{}]".format(start_igr, end_igr)
         seq = record.seq[start_igr:end_igr]
         sequences.append(SeqRecord(seq, id=seq_id, description="intergenic region"))
@@ -57,7 +57,7 @@ def concatenate_fasta(infilenames, handle_out=stdout):
             sequences.append(SeqRecord(seq_record.seq, id=seq_id))
     SeqIO.write(sequences, handle_out ,"fasta")
 
-def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, identity_cutoff=80, length_cutoff=70, with_silent=False):
+def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, identity_cutoff=80, length_cutoff=70, add_silent=False):
     sep="\t"
     header = sep.join(["GeneName"] + inputlist)
     print(header,file=handle_nucl)
@@ -93,7 +93,7 @@ def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, id
                 # SNP
                 elif identity < 100 and gaps == 0:
                     non_coding = tools.SNP_non_coding(q_seq,s_seq)
-                    if with_silent:
+                    if add_silent:
                         coding = tools.SNP_coding(q_seq,s_seq,True)
                     else: 
                         coding = tools.SNP_coding(q_seq,s_seq)

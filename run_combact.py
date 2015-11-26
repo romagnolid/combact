@@ -18,7 +18,9 @@ def main():
         help="genome(s) to be analyzed with blast")
     parser.add_argument("-o", default="Output", dest="output",
         help="output folder (default=Output)")
-    parser.add_argument("--with-silent", action="store_true",
+    parser.add_argument("--add-igr", action="store_true",
+        help="extract intergenic region from genbank file")
+    parser.add_argument("--add-silent", action="store_true",
         help="report silent mutations too")
     parser.add_argument("--id-cutoff", default=80, type=float,
         help="percent identity cutoff (default=80)") 
@@ -28,21 +30,23 @@ def main():
     args = parser.parse_args()
     params = vars(args)
     
-    if params.get("genbank"):
-        fasta_file = splitext(basename(params["genbank"]))[0] + ".fna"
-        if not exists(fasta_file):
-            combact.parse_gb_file(params["genbank"], open(fasta_file,"w"))
-        else:
-            print(fasta_file + " already exists so it won't be overwritten. Move it, rename it or delete it.")
-        gene_list = fasta_file
-    else:
-        gene_list = params.get("gene_list")
-    
     # output folder
     try:
         os.mkdir(params["output"])
     except OSError:
         pass
+    
+    # genbank or gene list
+    if params.get("genbank"):
+        fasta_file = join(params["output"],splitext(basename(params["genbank"]))[0] + ".fna")
+        if not exists(fasta_file):
+            if params["add_igr"]:
+                combact.parse_gb_file(params["genbank"], open(fasta_file,"w"), True)
+            else:
+                combact.parse_gb_file(params["genbank"], open(fasta_file,"w"))
+        gene_list = fasta_file
+    else:
+        gene_list = params.get("gene_list")
     
     # make database
     db_folder = join(params["output"],"Database")
@@ -53,11 +57,12 @@ def main():
     except OSError:
         pass
     
-    with open(db_file,"w") as db:
-        combact.concatenate_fasta(params["database"], db)
-    
-    # makeblastdb
-    call(["makeblastdb","-in", db_file,"-dbtype","nucl","-out", splitext(db_file)[0]])
+    if not exists(db_file):
+        combact.concatenate_fasta(params["database"], open(db_file,"w"))
+        # makeblastdb
+        call(["makeblastdb","-in", db_file,"-dbtype","nucl","-out", splitext(db_file)[0]])
+    else:
+        print("\nA database already exists. Delete the old file to make a new one.")
     
     # do blast search
     blast_folder = join(params["output"],"Blast")
@@ -68,10 +73,12 @@ def main():
         pass
     
     # blastn
-    cline = NcbiblastnCommandline(query=gene_list, db=splitext(db_file)[0], outfmt=5, out=blast_file)
-    print()
-    print(cline)
-    cline()
+    if not exists(blast_file):
+        cline = NcbiblastnCommandline(query=gene_list, db=splitext(db_file)[0], outfmt=5, out=blast_file)
+        print("\n" + cline)
+        cline()
+    else:
+        print("\nBlast output already exists. Delete the old file to make a new one.")
     
     # make reports
     reports_folder = join(params["output"],"Reports")
@@ -84,10 +91,10 @@ def main():
     amino_file = open(join(reports_folder,"amino.csv"),"w")
     genomes = [splitext(basename(path))[0] for path in params["database"]]
     
-    if not args.with_silent:
+    if not args.add_silent:
         combact.get_mutations(blast_file, genomes, full_file, amino_file, params["id_cutoff"], params["len_cutoff"])
     else:
-        combact.get_mutations(blast_file, genomes, full_file, amino_file, params["id_cutoff"], params["len_cutoff"], with_silent=True)
+        combact.get_mutations(blast_file, genomes, full_file, amino_file, params["id_cutoff"], params["len_cutoff"], add_silent=True)
     
     full_file.close()
     amino_file.close()
