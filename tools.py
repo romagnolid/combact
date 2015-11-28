@@ -1,9 +1,10 @@
-#!/usr/bin/env python
+#! /usr/bin/env python
 from __future__ import print_function
+
 """
 Different methods to classify genetic mutations.
 input: two DNA sequences
-output: a list with all mutations of one kind
+output: a string with all mutations of one kind separated by ";"
 """
 
 bases = ['T', 'C', 'A', 'G']
@@ -23,7 +24,7 @@ def insertion(x,y):
     x = x.upper()
     y = y.upper()
     i = 0
-    l = 0 # total sequence length (without gaps)
+    l = 0 # nucleotides count (excluding gaps)
     while i < len(x):
         if x[i] == "-":
             j = i
@@ -104,6 +105,7 @@ def SNP_coding(x,y,report_silent=False):
     y = y.upper()
     x_codons = [x[i:i+3] for i in range(0, len(x)-3+1, 3)]
     y_codons = [y[i:i+3] for i in range(0, len(y)-3+1, 3)]
+
     for i in range(len(x_codons)):
         if x_codons[i] != y_codons[i]:
             if i == 0:  
@@ -114,13 +116,13 @@ def SNP_coding(x,y,report_silent=False):
                 b = codon_table.get(y_codons[i],"X")
 
             if a == b != "X" and report_silent: 
-                mutations.append("p.{}{}_SILENT".format(i+1, a))
+                mutations.append("p.{}{}{}".format(a, i+1, b))
             elif a == b != "X" and not report_silent: 
-                mutations.append("_".format(i+1, a))
+                mutations.append("SILENT".format(i+1, a))
             elif b == "*":
-                mutations.append("p.{}{}>{}_NONSENSE".format(i+1, a, b))
+                mutations.append("p.{}{}{}".format(a, i+1, b))
             elif a != b or a == b == "X":
-                mutations.append("p.{}{}>{}_MISSENSE".format(i+1, a, b))
+                mutations.append("p.{}{}{}".format(a, i+1, b))
     return(";".join(mutations))
 
 if __name__ == "__main__":

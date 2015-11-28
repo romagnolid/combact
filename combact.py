@@ -24,20 +24,20 @@ def parse_gb_file(infilename, handle_out=stdout, add_igr=False):
         if feature.type in ("CDS","tRNA","rRNA"):
                end_igr = feature.location.start
                if end_igr - start_igr > 1 and add_igr:
-                   seq_id = "IGR:[{}:{}]".format(start_igr, end_igr)
+                   seq_id = "IGR:[{}:{}]".format(start_igr + 1, end_igr)
                    seq = record.seq[start_igr:end_igr]
                    sequences.append(SeqRecord(seq, id=seq_id, description="intergenic region"))
 
                locus_tag = feature.qualifiers["locus_tag"][0]
                seq_desc = feature.qualifiers["product"][0]
-               seq_id = "{}:{}:{}".format(feature.type,feature.location,locus_tag)
+               seq_id = "{}:[{}:{}]:{}".format(feature.type,feature.location.start + 1,feature.location.end,locus_tag)
                seq = feature.extract(record.seq)
                sequences.append(SeqRecord(seq,id=seq_id,description=seq_desc))
                start_igr = feature.location.end
 
     end_igr = len(record.seq)
     if end_igr - start_igr > 1 and add_igr:
-        seq_id = "IGR:[{}:{}]".format(start_igr, end_igr)
+        seq_id = "IGR:[{}:{}]".format(start_igr + 1, end_igr)
         seq = record.seq[start_igr:end_igr]
         sequences.append(SeqRecord(seq, id=seq_id, description="intergenic region"))
     SeqIO.write(sequences, handle_out, "fasta")
@@ -53,13 +53,14 @@ def concatenate_fasta(infilenames, handle_out=stdout):
         filename = splitext(basename(path))[0]
         records = SeqIO.parse(path,"fasta")
         for i, seq_record in enumerate(records, 1):
-            seq_id = "{}|{}|{}".format(filename, seq_record.id, str(i))
+            seq_id = "{}|{}|{}".format(filename, seq_record.id, str(i)) # remove str(i)?
             sequences.append(SeqRecord(seq_record.seq, id=seq_id))
     SeqIO.write(sequences, handle_out ,"fasta")
 
-def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, identity_cutoff=80, length_cutoff=70, add_silent=False):
+def get_mutations(infilename, inputlist, handle_full=None, handle_nucl=None, handle_amino=None, identity_cutoff=80, length_cutoff=70, add_silent=False):
     sep="\t"
     header = sep.join(["GeneName"] + inputlist)
+    print(header,file=handle_full)
     print(header,file=handle_nucl)
     print(header,file=handle_amino)
 
@@ -68,6 +69,7 @@ def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, id
     for blast_record in blast_records:
         query = blast_record.query
         q_len = blast_record.query_length
+        full_array = dict(zip(inputlist, [[] for i in range(len(inputlist))]))
         nucl_array = dict(zip(inputlist, [[] for i in range(len(inputlist))]))
         amino_array = dict(zip(inputlist, [[] for i in range(len(inputlist))]))
         for alignment in blast_record.alignments:
@@ -99,7 +101,8 @@ def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, id
                         coding = tools.SNP_coding(q_seq,s_seq)
 
                     # whether the gene codes for a protein or not
-                    nucl_array[sbjct].append(non_coding+"$"+coding)
+                    full_array[sbjct].append(non_coding+"$"+coding)
+                    nucl_array[sbjct].append(non_coding)
                     amino_array[sbjct].append(coding)
     
                 # indel
@@ -110,6 +113,7 @@ def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, id
                         indels = ins + ";" + dels
                     else:
                         indels = ins + dels
+                    full_array[sbjct].append(indels)
                     nucl_array[sbjct].append(indels)
                     amino_array[sbjct].append("INDEL")
     
@@ -122,6 +126,7 @@ def get_mutations(infilename, inputlist, handle_nucl=None, handle_amino=None, id
                 else:
                     raise AlignmentError("Unknown mutation type occuring between " + query + " and " + sbjct)
 
+        print(sep.join([query]+["/".join(full_array[sbjct]) for sbjct in inputlist]),file=handle_full)
         print(sep.join([query]+["/".join(nucl_array[sbjct]) for sbjct in inputlist]),file=handle_nucl)
 
         if sum([len(amino_array[sbjct]) for sbjct in inputlist]) > 0:
