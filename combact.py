@@ -90,7 +90,9 @@ def get_mutations(infilename, inputlist, handle_full=None, handle_nucl=None, han
                 
                 # wild-type
                 elif identity == 100 and q_len == align_len:
-                    nucl_array[sbjct].append("WT")
+                    full_array[sbjct].append("wt")
+                    nucl_array[sbjct].append("wt")
+                    amino_array[sbjct].append("wt")
     
                 # SNP
                 elif identity < 100 and gaps == 0:
@@ -101,9 +103,9 @@ def get_mutations(infilename, inputlist, handle_full=None, handle_nucl=None, han
                         coding = tools.SNP_coding(q_seq,s_seq)
 
                     # whether the gene codes for a protein or not
-                    full_array[sbjct].append(non_coding+"$"+coding)
-                    nucl_array[sbjct].append(non_coding)
-                    amino_array[sbjct].append(coding)
+                    full_array[sbjct].append("c.["+non_coding+"]"+"="+"p.["+coding+"]")
+                    nucl_array[sbjct].append("c.["+non_coding+"]")
+                    amino_array[sbjct].append("p.["+coding+"]")
     
                 # indel
                 elif q_start == 1 and q_end == q_len and gaps > 0:
@@ -113,21 +115,31 @@ def get_mutations(infilename, inputlist, handle_full=None, handle_nucl=None, han
                         indels = ins + ";" + dels
                     else:
                         indels = ins + dels
-                    full_array[sbjct].append(indels)
-                    nucl_array[sbjct].append(indels)
+                    full_array[sbjct].append("c.["+indels+"]")
+                    nucl_array[sbjct].append("c.["+indels+"]")
                     amino_array[sbjct].append("INDEL")
     
-                # fragment
-                elif q_start > 1 or q_end < q_len:
-                    frag = "Fragment[{0}:{1}]".format(q_start,q_end)
+                # fragment WT
+                elif q_start > 1 or q_end < q_len and identity == 100:
+                    frag = "wt[{}:{}]".format(q_start,q_end)
+                    full_array[sbjct].append(frag)
+                    nucl_array[sbjct].append(frag)
+
+                # fragment WT
+                elif q_start > 1 or q_end < q_len :
+                    frag = "Fragment_mut[{}:{}]".format(q_start,q_end)
+                    full_array[sbjct].append(frag)
                     nucl_array[sbjct].append(frag)
     
                 # any unforseen mutation
                 else:
                     raise AlignmentError("Unknown mutation type occuring between " + query + " and " + sbjct)
 
-        print(sep.join([query]+["/".join(full_array[sbjct]) for sbjct in inputlist]),file=handle_full)
-        print(sep.join([query]+["/".join(nucl_array[sbjct]) for sbjct in inputlist]),file=handle_nucl)
+        if sum([x != ["wt"] for x in full_array.values()]) > 0: # i.e. at least one non-wt
+            print(sep.join([query]+["/".join(full_array[sbjct]) for sbjct in inputlist]),file=handle_full)
 
-        if sum([len(amino_array[sbjct]) for sbjct in inputlist]) > 0:
+        if sum([x != ["wt"] for x in nucl_array.values()]) > 0: # i.e. at least one non-wt
+            print(sep.join([query]+["/".join(nucl_array[sbjct]) for sbjct in inputlist]),file=handle_nucl)
+
+        if sum([x not in (["wt"]) for x in amino_array.values()]) > 0: # i.e. at least one non-wt or empty string 
             print(sep.join([query]+["/".join(amino_array[sbjct]) for sbjct in inputlist]),file=handle_amino)

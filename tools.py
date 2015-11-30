@@ -32,7 +32,7 @@ def insertion(x,y):
             i += 1
             while has_gap:
                 if x[i] != "-":
-                    mutations.append("c.{}_{}ins{}".format(l,l+1, y[j:i]))
+                    mutations.append("{}_{}ins{}".format(l,l+1, y[j:i]))
                     has_gap = False
                     i += 1
                     l += 1
@@ -58,10 +58,10 @@ def deletion(x,y):
                 if y[i] != "-":
                     if (i-j) > 1:
                         mutations.append(
-                            "c.{}_{}del{}".format(j+1-k,j+(i-j)-k,x[j:i]))
+                            "{}_{}del{}".format(j+1-k,j+(i-j)-k,x[j:i]))
                     else:
                         mutations.append(
-                            "c.{}del{}".format(j+1-k,x[j:i]))
+                            "{}del{}".format(j+1-k,x[j:i]))
                     if x[i] == "-":
                         k += 1
                     has_gap = False
@@ -89,11 +89,11 @@ def SNP_non_coding(x,y):
                 if x[i] != y[i]:
                     i += 1
                 else:
-                    mutations.append("c.{}{}>{}".format(j+1,x[j:i],y[j:i]))
+                    mutations.append("{}{}>{}".format(j+1,x[j:i],y[j:i]))
                     mutated = False
                     i += 1
             if i == len(x):
-                mutations.append("c.{}{}>{}".format(j+1,x[j:i],y[j:i]))
+                mutations.append("{}{}>{}".format(j+1,x[j:i],y[j:i]))
         else:
             i += 1
     return(";".join(mutations))
@@ -116,25 +116,41 @@ def SNP_coding(x,y,report_silent=False):
                 b = codon_table.get(y_codons[i],"X")
 
             if a == b != "X" and report_silent: 
-                mutations.append("p.{}{}{}".format(a, i+1, b))
-            elif a == b != "X" and not report_silent: 
-                mutations.append("SILENT".format(i+1, a))
+                mutations.append("{}{}{}".format(a, i+1, b))
+            #elif a == b != "X" and not report_silent: 
+            #    mutations.append("SILENT".format(i+1, a))
             elif b == "*":
-                mutations.append("p.{}{}{}".format(a, i+1, b))
+                mutations.append("{}{}{}".format(a, i+1, b))
             elif a != b or a == b == "X":
-                mutations.append("p.{}{}{}".format(a, i+1, b))
+                mutations.append("{}{}{}".format(a, i+1, b))
     return(";".join(mutations))
 
 if __name__ == "__main__":
-    print("Without silent:",SNP_coding("atgaatggtttgagt","Gtgaatggtttgagt"))
-    print("With silent:",SNP_coding("atgaatggtttgagt","Gtgaatggtttgagt",True))
-    print("Without silent:",SNP_coding("atgAXGaca","atgAXGact"))
-    print("With silent:",SNP_coding("atgAXGaca","atgAXGact",True))
-    print(SNP_non_coding("atgAXGaca","atgAXGact"))
+    a = "atgaatggtttgagt"
+    b = "GtgaCGggtttgagt"
+    print(a,b)
+    print("Without silent:",SNP_coding(a,b))
+    print("With silent:",SNP_coding(a,b,True))
+    print(SNP_non_coding(a,b))
+    print()
+
+    a = "atgAXGaca"
+    b = "atgAXGact"
+    print(a,b)
+    print("Without silent:",SNP_coding(a,b))
+    print("With silent:",SNP_coding(a,b,True))
+    print(SNP_non_coding(a,b))
+    print()
+
     x = "aa---aaaa--aaa-aaa"
     y = "aaACTaaaaGTaaaGaaa"
+    print(x,y)
     print(insertion(x,y))
+    print()
 
     x = "aAaa--a--aaaaTGTaa"
     y = "a-aaaaaaaaaaa---aa"
+    print(x,y)
     print(deletion(x,y))
+    print(insertion(x,y))
+    print()

@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 from __future__ import print_function
 import argparse, os, shutil
+import time, datetime
 from os.path import splitext, join, basename, exists
 from subprocess import call
 from shutil import copy
 from Bio.Blast.Applications import NcbiblastnCommandline
 import combact
 
-def main():
-    parser = argparse.ArgumentParser(description="ComBact 0.2")
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="ComBact")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-i", "--input", dest="gene_list",
         help="list of genes to be aligned")
@@ -27,9 +28,16 @@ def main():
     parser.add_argument("--len-cutoff", default=70, type=float,
         help="percent length cutoff (default=70)")
     
-    args = parser.parse_args()
+    if argv is not None:
+        args = parser.parse_args(argv.split())
+    else:
+        args = parser.parse_args()
+
     params = vars(args)
     
+    print("\nAnalysis started at", time.ctime())
+    start = time.time()
+
     # output folder
     try:
         os.mkdir(params["output"])
@@ -39,14 +47,17 @@ def main():
     # genbank or gene list
     if params.get("genbank"):
         fasta_file = join(params["output"],splitext(basename(params["genbank"]))[0] + ".fna")
-        print("Parsing Genbank file...")
         if not exists(fasta_file):
+            print("Parsing Genbank file...")
             if params["add_igr"]:
                 combact.parse_gb_file(params["genbank"], open(fasta_file,"w"), True)
             else:
                 combact.parse_gb_file(params["genbank"], open(fasta_file,"w"))
+            print("Done", str(datetime.timedelta(seconds=time.time()-start)))
+
+        print("\nWarning: Genbank file already been parsed. Delete it to create a new one.")
         gene_list = fasta_file
-        print("Done.")
+
     else:
         gene_list = params.get("gene_list")
     
@@ -80,10 +91,16 @@ def main():
         cline = NcbiblastnCommandline(query=gene_list, db=splitext(db_file)[0], outfmt=11, out=blastAsn_file)
         print("\nBlast command line:\n" + str(cline))
         cline()
-        print("\nCreating xml blast output.")
+        print("Done", str(datetime.timedelta(seconds=time.time()-start)))
+
+        print("\nCreating xml blast output...")
         call(["blast_formatter", "-archive", blastAsn_file, "-out", blastXml_file, "-outfmt", "5"])
-        print("\nCreating text blast output.")
+        print("Done", str(datetime.timedelta(seconds=time.time()-start)))
+
+        print("\nCreating text blast output...")
         call(["blast_formatter", "-archive", blastAsn_file, "-out", blastTxt_file, "-outfmt", "0"])
+        print("Done", str(datetime.timedelta(seconds=time.time()-start)))
+
     else:
         print("\nWarning: blast output already exist. Delete it to create a new one.")
     
@@ -108,7 +125,7 @@ def main():
     full_file.close()
     nucl_file.close()
     amino_file.close()
-    print("Done.")
+    print("Done", str(datetime.timedelta(seconds=time.time()-start)))
 
 if __name__ == "__main__":
     main()
