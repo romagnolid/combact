@@ -9,7 +9,7 @@ from Bio.Blast.Applications import NcbiblastnCommandline
 import combact
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="ComBact_0.4")
+    parser = argparse.ArgumentParser(description="ComBact_0.4.1")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-r", "--reference", dest="gene_list",
         help="reference genome")

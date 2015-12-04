@@ -105,12 +105,15 @@ def get_mutations(infilename, genomes, out_folder="temp", identity_cutoff=80, le
                 # SNP
                 elif identity < 100 and gaps == 0:
                     non_coding = tools.SNP_non_coding(q_seq,s_seq)
-                    coding = tools.SNP_coding(q_seq,s_seq,True)
-
-                    # whether the gene codes for a protein or not
-                    full_array[sbjct].append("c.["+non_coding+"]"+"="+"p.["+coding+"]")
                     nucl_array[sbjct].append("c.["+non_coding+"]")
-                    amino_array[sbjct].append("p.["+coding+"]")
+
+                    if query.startswith("CDS"):
+                        coding = tools.SNP_coding(q_seq,s_seq,True)
+                        full_array[sbjct].append("c.["+non_coding+"]"+"="+"p.["+coding+"]")
+                        amino_array[sbjct].append("p.["+coding+"]")
+                    else:
+                        full_array[sbjct].append("c.["+non_coding+"]")
+                        amino_array[sbjct].append("mutated_non_coding_dna")
     
                 # indel
                 elif q_start == 1 and q_end == q_len and gaps > 0:
