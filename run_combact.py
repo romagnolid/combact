@@ -9,24 +9,28 @@ from Bio.Blast.Applications import NcbiblastnCommandline
 import combact
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="ComBact")
+    parser = argparse.ArgumentParser(description="ComBact_0.3")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("-i", "--input", dest="gene_list",
-        help="list of genes to be aligned")
+    group.add_argument("-r", "--reference", dest="gene_list",
+        help="reference genome")
     group.add_argument("-g", "--genbank",
-        help="genbank file which genes will be extracted from")
+        help="reference genome (Genbank format)")
+
+    parser.add_argument("-l",nargs=1,dest="file_list",
+        help="genome(s) to be analyzed with blast")
+
     parser.add_argument("-d",nargs="+",dest="database",
         help="genome(s) to be analyzed with blast")
     parser.add_argument("-o", default="Combact_output", dest="output",
         help="output folder (default=Combact_output)")
+    parser.add_argument("-L","--length-cutoff", default=70, type=float,
+        help="percent length cutoff (default=70)")
+    parser.add_argument("-I","--identity-cutoff", default=80, type=float,
+        help="percent identity cutoff (default=80)") 
     parser.add_argument("--add-igr", action="store_true",
         help="extract intergenic region from genbank file")
-    parser.add_argument("--add-silent", action="store_true",
+    parser.add_argument("--add-silent", action="store_true", dest="silent_opt",
         help="report silent mutations too")
-    parser.add_argument("--id-cutoff", default=80, type=float,
-        help="percent identity cutoff (default=80)") 
-    parser.add_argument("--len-cutoff", default=70, type=float,
-        help="percent length cutoff (default=70)")
     
     if argv is not None:
         args = parser.parse_args(argv.split())
@@ -34,8 +38,11 @@ def main(argv=None):
         args = parser.parse_args()
 
     params = vars(args)
-    
-    print("\nAnalysis started at", time.ctime())
+
+#    print(params)
+#def nope():
+
+    print("\nAnalysis started at " + time.ctime())
     start = time.time()
 
     # output folder
@@ -46,7 +53,7 @@ def main(argv=None):
     
     # genbank or gene list
     if params.get("genbank"):
-        fasta_file = join(params["output"],splitext(basename(params["genbank"]))[0] + ".fna")
+        fasta_file = join(params["output"], splitext(basename(params["genbank"]))[0] + ".fna")
         if not exists(fasta_file):
             print("Parsing Genbank file...")
             if params["add_igr"]:
@@ -54,8 +61,8 @@ def main(argv=None):
             else:
                 combact.parse_gb_file(params["genbank"], open(fasta_file,"w"))
             print("Done", str(datetime.timedelta(seconds=time.time()-start)))
-
-        print("\nWarning: Genbank file already been parsed. Delete it to create a new one.")
+        else:
+            print("\nWarning: Genbank file already been parsed. Delete it to create a new one.")
         gene_list = fasta_file
 
     else:
@@ -69,9 +76,15 @@ def main(argv=None):
     except OSError:
         pass
     
+    if params["database"]:
+        files = params["database"]
+    elif params["file_list"]:
+        with open(params["file_list"][0]) as fl:
+            lines = fl.readlines()
+            files = [line.split()[0] for line in lines]
     # makeblastdb
     if not exists(db_file):
-        combact.concatenate_fasta(params["database"], open(db_file,"w"))
+        combact.cat_fasta(files, open(db_file,"w"))
         call(["makeblastdb","-in", db_file,"-dbtype","nucl","-out", splitext(db_file)[0]])
     else:
         print("\nWarning: database already exists. Delete it to create a new one.")
@@ -111,20 +124,10 @@ def main(argv=None):
     except OSError:
         pass
     
-    full_file = open(join(reports_folder,"full.csv"),"w")
-    nucl_file = open(join(reports_folder,"nucl.csv"),"w")
-    amino_file = open(join(reports_folder,"amino.csv"),"w")
-    genomes = [splitext(basename(path))[0] for path in params["database"]]
-    
     print("\nParsing blast.xml output...")
-    if not params["add_silent"]:
-        combact.get_mutations(blastXml_file, genomes, full_file, nucl_file, amino_file, params["id_cutoff"], params["len_cutoff"])
-    else:
-        combact.get_mutations(blastXml_file, genomes, full_file, nucl_file, amino_file, params["id_cutoff"], params["len_cutoff"], add_silent=True)
+    genomes = [splitext(basename(path))[0] for path in files]
+    combact.get_mutations(blastXml_file, genomes, reports_folder, params["identity_cutoff"], params["length_cutoff"], params["silent_opt"])
     
-    full_file.close()
-    nucl_file.close()
-    amino_file.close()
     print("Done", str(datetime.timedelta(seconds=time.time()-start)))
 
 if __name__ == "__main__":

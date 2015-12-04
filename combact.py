@@ -3,7 +3,7 @@ from __future__ import print_function,division
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 from Bio.Blast import NCBIXML
-from os.path import basename, splitext
+from os.path import basename, splitext, join
 from sys import stdout
 import tools
 
@@ -42,7 +42,7 @@ def parse_gb_file(infilename, handle_out=stdout, add_igr=False):
         sequences.append(SeqRecord(seq, id=seq_id, description="intergenic region"))
     SeqIO.write(sequences, handle_out, "fasta")
 
-def concatenate_fasta(infilenames, handle_out=stdout):
+def cat_fasta(infilenames, handle_out=stdout):
     """Concatenate several fasta files into a single multifasta.
     """
     if not hasattr(infilenames,"__iter__"):
@@ -57,23 +57,31 @@ def concatenate_fasta(infilenames, handle_out=stdout):
             sequences.append(SeqRecord(seq_record.seq, id=seq_id))
     SeqIO.write(sequences, handle_out ,"fasta")
 
-def get_mutations(infilename, inputlist, handle_full=None, handle_nucl=None, handle_amino=None, identity_cutoff=80, length_cutoff=70, add_silent=False):
+def get_mutations(infilename, genomes, out_folder="temp", identity_cutoff=80, length_cutoff=70, add_silent=False):
     sep="\t"
-    header = sep.join(["GeneName"] + inputlist)
+    header = sep.join(["GeneName"] + genomes)
+
+    handle_full = open(join(out_folder,"full.csv"),"w")
+    handle_nucl = open(join(out_folder,"nucl.csv"),"w")
+    handle_amino = open(join(out_folder,"amino.csv"),"w")
+
     print(header,file=handle_full)
     print(header,file=handle_nucl)
     print(header,file=handle_amino)
 
+    all_wt_list = []
+    all_absent_list = []
     blast_records = NCBIXML.parse(open(infilename))
-
     for blast_record in blast_records:
         query = blast_record.query
         q_len = blast_record.query_length
-        full_array = dict(zip(inputlist, [[] for i in range(len(inputlist))]))
-        nucl_array = dict(zip(inputlist, [[] for i in range(len(inputlist))]))
-        amino_array = dict(zip(inputlist, [[] for i in range(len(inputlist))]))
+        full_array = dict(zip(genomes, [[] for i in range(len(genomes))]))
+        nucl_array = dict(zip(genomes, [[] for i in range(len(genomes))]))
+        amino_array = dict(zip(genomes, [[] for i in range(len(genomes))]))
         for alignment in blast_record.alignments:
             sbjct = alignment.hit_def.split("|")[0]
+            if full_array.get(sbjct) is None:
+                continue
     
             for hsp in alignment.hsps:
                 q_start = hsp.query_start
@@ -97,10 +105,7 @@ def get_mutations(infilename, inputlist, handle_full=None, handle_nucl=None, han
                 # SNP
                 elif identity < 100 and gaps == 0:
                     non_coding = tools.SNP_non_coding(q_seq,s_seq)
-                    if add_silent:
-                        coding = tools.SNP_coding(q_seq,s_seq,True)
-                    else: 
-                        coding = tools.SNP_coding(q_seq,s_seq)
+                    coding = tools.SNP_coding(q_seq,s_seq,True)
 
                     # whether the gene codes for a protein or not
                     full_array[sbjct].append("c.["+non_coding+"]"+"="+"p.["+coding+"]")
@@ -111,35 +116,52 @@ def get_mutations(infilename, inputlist, handle_full=None, handle_nucl=None, han
                 elif q_start == 1 and q_end == q_len and gaps > 0:
                     ins = tools.insertion(q_seq,s_seq)
                     dels = tools.deletion(q_seq,s_seq)
-                    if len(ins)*len(dels) > 0: 
+
+                    if ins and dels: 
                         indels = ins + ";" + dels
                     else:
                         indels = ins + dels
+
                     full_array[sbjct].append("c.["+indels+"]")
                     nucl_array[sbjct].append("c.["+indels+"]")
-                    amino_array[sbjct].append("INDEL")
+                    amino_array[sbjct].append("indel")
     
                 # fragment WT
-                elif q_start > 1 or q_end < q_len and identity == 100:
+                elif (q_start > 1 or q_end < q_len) and identity == 100:
                     frag = "wt[{}:{}]".format(q_start,q_end)
                     full_array[sbjct].append(frag)
                     nucl_array[sbjct].append(frag)
+                    amino_array[sbjct].append(frag)
 
                 # fragment WT
                 elif q_start > 1 or q_end < q_len :
                     frag = "Fragment_mut[{}:{}]".format(q_start,q_end)
                     full_array[sbjct].append(frag)
                     nucl_array[sbjct].append(frag)
+                    amino_array[sbjct].append(frag)
     
                 # any unforseen mutation
                 else:
                     raise AlignmentError("Unknown mutation type occuring between " + query + " and " + sbjct)
 
-        if sum([x != ["wt"] for x in full_array.values()]) > 0: # i.e. at least one non-wt
-            print(sep.join([query]+["/".join(full_array[sbjct]) for sbjct in inputlist]),file=handle_full)
 
-        if sum([x != ["wt"] for x in nucl_array.values()]) > 0: # i.e. at least one non-wt
-            print(sep.join([query]+["/".join(nucl_array[sbjct]) for sbjct in inputlist]),file=handle_nucl)
+        all_wt = full_array.values().count(["wt"]) == len(full_array.values())
+        all_absent = full_array.values().count([]) == len(full_array.values())
 
-        if sum([x not in (["wt"]) for x in amino_array.values()]) > 0: # i.e. at least one non-wt or empty string 
-            print(sep.join([query]+["/".join(amino_array[sbjct]) for sbjct in inputlist]),file=handle_amino)
+        if all_wt: 
+            all_wt_list.append(query+"\n")
+        elif all_absent:
+            all_absent_list.append(query+"\n")
+        else:
+            print(sep.join([query] + ["|".join(full_array[sbjct]) for sbjct in genomes]),file=handle_full)
+            print(sep.join([query] + ["|".join(nucl_array[sbjct]) for sbjct in genomes]),file=handle_nucl)
+            print(sep.join([query] + ["|".join(amino_array[sbjct]) for sbjct in genomes]),file=handle_amino)
+
+    handle_full.close()
+    handle_nucl.close()
+    handle_amino.close()
+    with open(join(out_folder, "wild_type.csv"),"w") as wt:
+        wt.writelines(all_wt_list)
+
+    with open(join(out_folder, "absent.csv"),"w") as absent:
+        absent.writelines(all_absent_list)
