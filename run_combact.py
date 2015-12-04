@@ -9,7 +9,7 @@ from Bio.Blast.Applications import NcbiblastnCommandline
 import combact
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="ComBact_0.3")
+    parser = argparse.ArgumentParser(description="ComBact_0.4")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-r", "--reference", dest="gene_list",
         help="reference genome")
@@ -99,20 +99,20 @@ def main(argv=None):
     except OSError:
         pass
     
-    if not exists(blastAsn_file):
+    if not exists(blastXml_file):
         # blastn
-        cline = NcbiblastnCommandline(query=gene_list, db=splitext(db_file)[0], outfmt=11, out=blastAsn_file)
+        cline = NcbiblastnCommandline(query=gene_list, db=splitext(db_file)[0], outfmt=5, out=blastXml_file)
         print("\nBlast command line:\n" + str(cline))
         cline()
         print("Done", str(datetime.timedelta(seconds=time.time()-start)))
 
-        print("\nCreating xml blast output...")
-        call(["blast_formatter", "-archive", blastAsn_file, "-out", blastXml_file, "-outfmt", "5"])
-        print("Done", str(datetime.timedelta(seconds=time.time()-start)))
+        #print("\nCreating xml blast output...")
+        #call(["blast_formatter", "-archive", blastAsn_file, "-out", blastXml_file, "-outfmt", "5"])
+        #print("Done", str(datetime.timedelta(seconds=time.time()-start)))
 
-        print("\nCreating text blast output...")
-        call(["blast_formatter", "-archive", blastAsn_file, "-out", blastTxt_file, "-outfmt", "0"])
-        print("Done", str(datetime.timedelta(seconds=time.time()-start)))
+        #print("\nCreating text blast output...")
+        #call(["blast_formatter", "-archive", blastAsn_file, "-out", blastTxt_file, "-outfmt", "0"])
+        #print("Done", str(datetime.timedelta(seconds=time.time()-start)))
 
     else:
         print("\nWarning: blast output already exist. Delete it to create a new one.")

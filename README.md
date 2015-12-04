@@ -40,7 +40,7 @@ Two text files reporting genes either being wild-type in all genomes or absent (
 
 *full.csv* reports mutations at both nucleic and aminoacid level;
 
-*full.csv* reports mutations at nucleic level;
+*nucl.csv* reports mutations at nucleic level;
 
 *amino.csv* reports mutations at aminoacid level.
 

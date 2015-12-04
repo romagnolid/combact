@@ -152,10 +152,9 @@ def get_mutations(infilename, genomes, out_folder="temp", identity_cutoff=80, le
             all_wt_list.append(query+"\n")
         elif all_absent:
             all_absent_list.append(query+"\n")
-        else:
-            print(sep.join([query] + ["|".join(full_array[sbjct]) for sbjct in genomes]),file=handle_full)
-            print(sep.join([query] + ["|".join(nucl_array[sbjct]) for sbjct in genomes]),file=handle_nucl)
-            print(sep.join([query] + ["|".join(amino_array[sbjct]) for sbjct in genomes]),file=handle_amino)
+        print(sep.join([query] + ["|".join(full_array[sbjct]) for sbjct in genomes]),file=handle_full)
+        print(sep.join([query] + ["|".join(nucl_array[sbjct]) for sbjct in genomes]),file=handle_nucl)
+        print(sep.join([query] + ["|".join(amino_array[sbjct]) for sbjct in genomes]),file=handle_amino)
 
     handle_full.close()
     handle_nucl.close()
