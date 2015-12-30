@@ -6,6 +6,7 @@ import argparse
 import os
 import os.path
 import sys
+import time
 
 def main(args=None):
     parser = argparse.ArgumentParser()
@@ -13,18 +14,33 @@ def main(args=None):
         help="the genbank input file")
     parser.add_argument("-o","--output",metavar="OUTPUT_FILE",
         help="the output fasta file [default stdout]")
+    parser.add_argument("-t","--tag-list",metavar="FILE",
+        help="tags to be extracted from genbank [default all]")        
     parser.add_argument("--igr", action="store_true",
         help="extract intergenic region from genbank file")
 
     args = parser.parse_args(args)
 
-    if args.output and os.path.exists(args.output):
-        raise IOError("{} already exists".format(args.output))
-    elif args.output:
-        output = open(args.output,"a")
+    print("Parsing genbank, current time:",time.strftime("%d/%m/%y at %H:%M:%S"),file=sys.stderr)
+    start = time.time()
+
+    if args.output:
+        output = open(args.output,"w")
     else:
         output = sys.stdout
-    
+        
+    # create multifasta with list of tag
+    if args.tag_list:
+        print("Proceed to extract tags from list",file=sys.stderr)
+        tag_list = set(open(args.tag_list).read().split())
+    else:
+        print("Warning: tag-list not provided, all loci will be extracted",file=sys.stderr)
+        
+    if args.igr:
+        print("Proceed to extract intergenic regions",file=sys.stderr)
+    else:
+        print("Warning: intergenic region will NOT be extracted",file=sys.stderr)
+        
     sequences = []
     records = SeqIO.parse(args.genbank,"gb")
     for record in records:
@@ -34,25 +50,34 @@ def main(args=None):
             if feat.type not in ("source","gene"):
                 end_igr = feat.location.start
                 if (end_igr - start_igr > 1) and args.igr:
-                    seq_id = "igr|[{}:{}]".format(start_igr+1, end_igr)
+                    seq_id = "igr|[{s}:{e}]".format(s=start_igr+1, e=end_igr)
                     seq = record.seq[start_igr:end_igr]
                     sequence = SeqRecord(seq,id=seq_id,description=record_data)
                     SeqIO.write(sequence, output, "fasta")
                 tag = feat.qualifiers.get("locus_tag",["unknown_locus_tag"])[0]
-                seq_id = "{}|[{}:{}]|{}".format(tag,feat.location.start+1,feat.location.end,feat.type)
+                seq_id = "{tag}|[{s}:{e}]|{typ}|".format(tag=tag,s=feat.location.start+1,e=feat.location.end,typ=feat.type)
                 seq = feat.extract(record.seq)
                 sequence = SeqRecord(seq,id=seq_id,description=record_data)
-                SeqIO.write(sequence, output, "fasta")
+
+                if args.tag_list and (tag in tag_list):
+                    SeqIO.write(sequence, output, "fasta")
+                elif args.tag_list:
+                    print("Warning:",locus_tag,"not present",file=sys.stderr)
+                else:
+                    SeqIO.write(sequence, output, "fasta")                
+
                 start_igr = feat.location.end
-        end_igr = len(record.seq)
+        
+        end_igr = len(record.seq)       
         if (end_igr - start_igr > 1) and args.igr:
-            seq_id = "igr|[{}:{}]".format(start_igr+1, end_igr)
+            seq_id = "igr|[{s}:{e}]".format(s=start_igr+1, e=end_igr)
             seq = record.seq[start_igr:end_igr]
             sequence = SeqRecord(seq,id=seq_id,description=record_data)
             SeqIO.write(sequence, output, "fasta")
 
     if args.output:
         output.close()
+    print("Completed in",round(time.time()-start,4),"seconds.",file=sys.stderr)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
