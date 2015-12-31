@@ -7,9 +7,118 @@ import argparse
 import os
 import os.path
 import sys
-import tools
 import csv
 import time
+
+def insertion(x,y):
+    mutations = []
+    x = x.upper()
+    y = y.upper()
+    i = 0
+    l = 0 # nucleotides count (excluding gaps)
+    while i < len(x):
+        if x[i] == "-":
+            j = i
+            has_gap = True
+            i += 1
+            while has_gap:
+                if x[i] != "-":
+                    mutations.append("{}_{}ins{}".format(l,l+1, y[j:i]))
+                    has_gap = False
+                    i += 1
+                    l += 1
+                else:
+                    i += 1
+        else:
+            i += 1
+            l += 1
+    return(";".join(mutations))
+
+def deletion(x,y):
+    mutations = []
+    x = x.upper()
+    y = y.upper()
+    i = 0
+    k = 0
+    while i < len(y):
+        if y[i] == "-":
+            j = i 
+            has_gap = True
+            i += 1
+            while has_gap:
+                if y[i] != "-":
+                    if (i-j) > 1:
+                        mutations.append(
+                            "{}_{}del{}".format(j+1-k,j+(i-j)-k,x[j:i]))
+                    else:
+                        mutations.append(
+                            "{}del{}".format(j+1-k,x[j:i]))
+                    if x[i] == "-":
+                        k += 1
+                    has_gap = False
+                    i += 1
+                else:
+                    i += 1
+        else:
+            if x[i] == "-":
+                k += 1
+            i += 1
+    return(";".join(mutations))
+
+def SNP_non_coding(x,y):
+    """Return string differences as SNP mutation at DNA level"""
+    mutations = []
+    x = x.upper()
+    y = y.upper()
+    i = 0
+    while i < len(x):
+        if x[i] != y[i]:
+            mutated = True
+            j = i
+            i += 1
+            while mutated and i<len(x):
+                if x[i] != y[i]:
+                    i += 1
+                else:
+                    mutations.append("{}{}>{}".format(j+1,x[j:i],y[j:i]))
+                    mutated = False
+                    i += 1
+            if i == len(x):
+                mutations.append("{}{}>{}".format(j+1,x[j:i],y[j:i]))
+        else:
+            i += 1
+    return(";".join(mutations))
+
+def SNP_coding(x,y,report_silent=False):
+    """Return string differences as SNP mutation at protein level"""
+    bases = ['T', 'C', 'A', 'G']
+    codons = [a+b+c for a in bases for b in bases for c in bases]
+    amino_acids = 'FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG'
+    codon_table = dict(zip(codons, amino_acids))
+    start_table = {"TTG":"M","CTG":"M","ATT":"M","ATC":"M","ATA":"M","ATG":"M","GTG":"M"}
+
+    mutations = []
+    x = x.upper()
+    y = y.upper()
+    x_codons = [x[i:i+3] for i in range(0, len(x)-3+1, 3)]
+    y_codons = [y[i:i+3] for i in range(0, len(y)-3+1, 3)]
+
+    for i in range(len(x_codons)):
+        if x_codons[i] != y_codons[i]:
+            if i == 0:  
+                a = start_table.get(x_codons[i],"X")
+                b = start_table.get(y_codons[i],"X")
+            else:            
+                a = codon_table.get(x_codons[i],"X")
+                b = codon_table.get(y_codons[i],"X")
+
+            if a == b != "X" and report_silent: 
+                mutations.append("{}{}{}".format(a, i+1, b))
+            elif a != b == "*":
+                mutations.append("{}{}{}".format(a, i+1, b))
+            elif a != b or a == b == "X":
+                mutations.append("{}{}{}".format(a, i+1, b))
+    return(";".join(mutations))
 
 class AlignmentError(Exception):
     def __init__(self, value):
@@ -25,9 +134,9 @@ def main(argv=None):
         help="List of files [default=input_list.txt]")
     parser.add_argument("-o","--output", default="Output",
         help="output folder (default=Output)")
-    parser.add_argument("-L","--length-cutoff", default=70, type=float,
-        help="percent length cutoff [default=70]")
-    parser.add_argument("-I","--identity-cutoff", default=80, type=float,
+    parser.add_argument("-L","--length",metavar="CUTOFF",default=70,type=float,
+        help="percent alignment length cutoff [default=70]")
+    parser.add_argument("-I","--identity",metavar="CUTOFF",default=80,type=float,
         help="percent identity cutoff [default=80]") 
     parser.add_argument("--silent-mut", action="store_true",
         help="additionally report silent mutations")
@@ -35,10 +144,10 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     start = time.time()
-    print("\nCompare Bacterial Genomes, current time:",time.strftime("%d/%m/%y at %H:%M:%S"))
+    print("Compare Bacterial Genomes, current time:",time.strftime("%d/%m/%y %H:%M:%S"))
 
-    id_cutoff = args.identity_cutoff
-    len_cutoff = args.identity_cutoff
+    id_cutoff = args.identity
+    len_cutoff = args.length
 
     # output folder
     try:
@@ -95,17 +204,17 @@ def main(argv=None):
                 # SNP
                 elif q_len == align_len and gaps == 0 and identity > id_cutoff:
                     #print("snp")
-                    non_coding = tools.SNP_non_coding(q_seq,s_seq)
+                    non_coding = SNP_non_coding(q_seq,s_seq)
                     nucl_hits[sbjct] = nucl_hits.get(sbjct,[]) + ["c.["+non_coding+"]"]
                     iscds = ("CDS" in query)
 
                     if iscds:
-                        coding = tools.SNP_coding(q_seq,s_seq,True)
+                        coding = SNP_coding(q_seq,s_seq,True)
                         full_hits[sbjct] = full_hits.get(sbjct,[]) + ["c.["+non_coding+"]"+"="+"p.["+coding+"]"]
-                        if args.silent_mut:
+                        if args.silent_mut is True:
                             amino_hits[sbjct] = amino_hits.get(sbjct,[]) + ["p.["+coding+"]"]
                         else:
-                            coding = tools.SNP_coding(q_seq,s_seq,False)
+                            coding = SNP_coding(q_seq,s_seq,False)
                             if len(coding)>0:
                                 amino_hits[sbjct] = amino_hits.get(sbjct,[]) + ["p.["+coding+"]"]
                     else:
@@ -115,8 +224,8 @@ def main(argv=None):
                 # indel
                 elif q_start == 1 and q_end == q_len and identity > id_cutoff: # and gaps > 0 (implicit)
                     #print("indel")
-                    ins = tools.insertion(q_seq,s_seq)
-                    dels = tools.deletion(q_seq,s_seq)
+                    ins = insertion(q_seq,s_seq)
+                    dels = deletion(q_seq,s_seq)
 
                     if ins and dels: # empty strings equal to false
                         indels = ins + ";" + dels

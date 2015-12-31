@@ -15,12 +15,12 @@ def main(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("fasta",metavar="INPUT_FILE",
         help="Multifasta with genes of interest")
-    parser.add_argument("-g","--genomes",metavar="GENOMES",nargs="*",
+    parser.add_argument("genomes",metavar="GENOMES",nargs="*",
         help="Files that will make the database")
     parser.add_argument("-l","--list",
         help="Text file with a list of files that will make the database")
     parser.add_argument("-o","--output",default="blast.xml",metavar="BLASTXML",
-        help="blast xml output [default blast.xml]")
+        help="blast xml output [default stdout]")
     args = parser.parse_args(args)
     
     if args.genomes:
@@ -39,7 +39,6 @@ def main(args=None):
                 filespaths.append(row[0])
                 genomes.append(row[1])
 
-    return
     # create database directory
     database = os.path.join(os.getcwd(),"Database","database.fa")
     try:
@@ -62,7 +61,7 @@ def main(args=None):
 
     # blast multifasta
     cline = NcbiblastnCommandline(query=args.fasta, db=os.path.splitext(database)[0], outfmt=5, out=args.output)
-    print("\nBlast alignment, current time:",time.strftime("%d/%m/%y at %H:%M:%S"),file=sys.stderr)
+    print("\nBlast alignment, current time:",time.strftime("%d/%m/%y %H:%M:%S"),file=sys.stderr)
     start = time.time()
     print(str(cline))
     cline()
