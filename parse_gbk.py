@@ -12,12 +12,12 @@ def main(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("genbank",metavar="INPUT_FILE",
         help="the genbank input file")
-    parser.add_argument("-o","--output",metavar="OUTPUT_FILE",
-        help="the output fasta file [default stdout]")
+    parser.add_argument("output",metavar="OUTPUT_FILE",
+        help="the output fasta file")
     parser.add_argument("-t","--tag-list",metavar="FILE",
-        help="tags to be extracted from genbank [default all]")        
+        help="list of tags to be extracted from genbank [optional]")        
     parser.add_argument("--igr", action="store_true",
-        help="extract intergenic region from genbank file")
+        help="also extract intergenic regions from genbank [optional]")
 
     args = parser.parse_args(args)
 

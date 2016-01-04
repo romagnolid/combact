@@ -14,13 +14,13 @@ import csv
 def main(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("fasta",metavar="INPUT_FILE",
-        help="Multifasta with genes of interest")
-    parser.add_argument("genomes",metavar="GENOMES",nargs="*",
-        help="Files that will make the database")
+        help="multifasta with genes of interest")
+    parser.add_argument("output",metavar="OUTPUT_FILE",
+        help="blast output filename (format xml)")
+    parser.add_argument("genomes",metavar="INPUT_GENOMES",nargs="*",
+        help="files that will be used to make the database")
     parser.add_argument("-l","--list",
-        help="Text file with a list of files that will make the database")
-    parser.add_argument("-o","--output",default="blast.xml",metavar="BLASTXML",
-        help="blast xml output [default stdout]")
+        help="list of absolute paths of files that will be used to make the database")
     args = parser.parse_args(args)
     
     if args.genomes:

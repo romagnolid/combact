@@ -10,6 +10,61 @@ import sys
 import csv
 import time
 
+def SNP_coding(x,y,report_silent=False):
+    """Return string differences as SNP mutation at protein level"""
+    bases = ['T', 'C', 'A', 'G']
+    codons = [a+b+c for a in bases for b in bases for c in bases]
+    amino_acids = 'FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG'
+    codon_table = dict(zip(codons, amino_acids))
+    start_table = {"TTG":"M","CTG":"M","ATT":"M","ATC":"M","ATA":"M","ATG":"M","GTG":"M"}
+
+    mutations = []
+    x = x.upper()
+    y = y.upper()
+    x_codons = [x[i:i+3] for i in range(0, len(x)-3+1, 3)]
+    y_codons = [y[i:i+3] for i in range(0, len(y)-3+1, 3)]
+
+    for i in range(len(x_codons)):
+        if x_codons[i] != y_codons[i]:
+            if i == 0:  
+                a = start_table.get(x_codons[i],"X")
+                b = start_table.get(y_codons[i],"X")
+            else:            
+                a = codon_table.get(x_codons[i],"X")
+                b = codon_table.get(y_codons[i],"X")
+
+            if a == b != "X" and report_silent: 
+                mutations.append("{}{}{}".format(a, i+1, b))
+            elif a != b == "*":
+                mutations.append("{}{}{}".format(a, i+1, b))
+            elif a != b or a == b == "X":
+                mutations.append("{}{}{}".format(a, i+1, b))
+    return(";".join(mutations))
+
+def SNP_non_coding(x,y):
+    """Return string differences as SNP mutation at DNA level"""
+    mutations = []
+    x = x.upper()
+    y = y.upper()
+    i = 0
+    while i < len(x):
+        if x[i] != y[i]:
+            mutated = True
+            j = i
+            i += 1
+            while mutated and i<len(x):
+                if x[i] != y[i]:
+                    i += 1
+                else:
+                    mutations.append("{}{}>{}".format(j+1,x[j:i],y[j:i]))
+                    mutated = False
+                    i += 1
+            if i == len(x):
+                mutations.append("{}{}>{}".format(j+1,x[j:i],y[j:i]))
+        else:
+            i += 1
+    return(";".join(mutations))
+
 def insertion(x,y):
     mutations = []
     x = x.upper()
@@ -65,61 +120,6 @@ def deletion(x,y):
             i += 1
     return(";".join(mutations))
 
-def SNP_non_coding(x,y):
-    """Return string differences as SNP mutation at DNA level"""
-    mutations = []
-    x = x.upper()
-    y = y.upper()
-    i = 0
-    while i < len(x):
-        if x[i] != y[i]:
-            mutated = True
-            j = i
-            i += 1
-            while mutated and i<len(x):
-                if x[i] != y[i]:
-                    i += 1
-                else:
-                    mutations.append("{}{}>{}".format(j+1,x[j:i],y[j:i]))
-                    mutated = False
-                    i += 1
-            if i == len(x):
-                mutations.append("{}{}>{}".format(j+1,x[j:i],y[j:i]))
-        else:
-            i += 1
-    return(";".join(mutations))
-
-def SNP_coding(x,y,report_silent=False):
-    """Return string differences as SNP mutation at protein level"""
-    bases = ['T', 'C', 'A', 'G']
-    codons = [a+b+c for a in bases for b in bases for c in bases]
-    amino_acids = 'FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG'
-    codon_table = dict(zip(codons, amino_acids))
-    start_table = {"TTG":"M","CTG":"M","ATT":"M","ATC":"M","ATA":"M","ATG":"M","GTG":"M"}
-
-    mutations = []
-    x = x.upper()
-    y = y.upper()
-    x_codons = [x[i:i+3] for i in range(0, len(x)-3+1, 3)]
-    y_codons = [y[i:i+3] for i in range(0, len(y)-3+1, 3)]
-
-    for i in range(len(x_codons)):
-        if x_codons[i] != y_codons[i]:
-            if i == 0:  
-                a = start_table.get(x_codons[i],"X")
-                b = start_table.get(y_codons[i],"X")
-            else:            
-                a = codon_table.get(x_codons[i],"X")
-                b = codon_table.get(y_codons[i],"X")
-
-            if a == b != "X" and report_silent: 
-                mutations.append("{}{}{}".format(a, i+1, b))
-            elif a != b == "*":
-                mutations.append("{}{}{}".format(a, i+1, b))
-            elif a != b or a == b == "X":
-                mutations.append("{}{}{}".format(a, i+1, b))
-    return(";".join(mutations))
-
 class AlignmentError(Exception):
     def __init__(self, value):
         self.parameter = value
@@ -127,37 +127,40 @@ class AlignmentError(Exception):
         return repr(self.parameter)
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="ComBact_0.6")
+    parser = argparse.ArgumentParser(description="ComBact_0.6.1")
     parser.add_argument("input",metavar="INPUT_FILE",
-        help="Blast output in xml format")
+        help="the blast xml output")
+    parser.add_argument("output",metavar="OUTPUT_DIRECTORY",
+        help="the output directory containing the three csv files")
     parser.add_argument("-i","--inlist",metavar="GENOMES_LIST",default="input_list.txt",
-        help="List of files [default=input_list.txt]")
-    parser.add_argument("-o","--output", default="Output",
-        help="output folder (default=Output)")
-    parser.add_argument("-L","--length",metavar="CUTOFF",default=70,type=float,
-        help="percent alignment length cutoff [default=70]")
-    parser.add_argument("-I","--identity",metavar="CUTOFF",default=80,type=float,
-        help="percent identity cutoff [default=80]") 
+        help="list of genomes used to make the database [default=\"input_list.txt\"]")
     parser.add_argument("--silent-mut", action="store_true",
         help="additionally report silent mutations")
+    parser.add_argument("-L","--length",metavar="CUTOFF",default=70,type=float,dest="len_cutoff",
+        help="percent alignment length cutoff [default=70]")
+    parser.add_argument("-I","--identity",metavar="CUTOFF",default=80,type=float,dest="id_cutoff",
+        help="percent identity cutoff [default=80]") 
     
     args = parser.parse_args(argv)
 
     start = time.time()
     print("Compare Bacterial Genomes, current time:",time.strftime("%d/%m/%y %H:%M:%S"))
 
-    id_cutoff = args.identity
-    len_cutoff = args.length
-
+    genomes = list()
+    # list of files used for the database
+    with open(args.inlist) as infile:
+        reader = csv.reader(infile,delimiter="\t")
+        for row in reader:
+            if len(row) == 1:
+                genomes.append(os.path.basename(os.path.splitext(row[0])[0]))
+            else:
+                genomes.append(row[1])
+    
     # output folder
     try:
         os.mkdir(args.output)
     except OSError:
         pass
-    
-    with open(args.inlist) as infile:
-        reader = csv.reader(infile,delimiter="\t")
-        genomes = [row[1] for row in reader]
     
     full_csv = open(os.path.join(args.output,"full.csv"),"w")
     full_writer = csv.DictWriter(full_csv, fieldnames=["Gene"] + genomes)
