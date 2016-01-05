@@ -11,7 +11,7 @@ import time
 import sys
 import csv
 
-def main(args=None):
+def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("fasta",metavar="INPUT_FILE",
         help="multifasta with genes of interest")
@@ -21,7 +21,9 @@ def main(args=None):
         help="files that will be used to make the database")
     parser.add_argument("-l","--list",
         help="list of absolute paths of files that will be used to make the database")
-    args = parser.parse_args(args)
+    parser.add_argument("--blast-opt",type=str,default="",
+        help="additional options for blastn (put them between quotes \"\")")
+    args = parser.parse_args(argv)
     
     if args.genomes:
         filespaths = args.genomes
@@ -56,16 +58,30 @@ def main(args=None):
                 description=genomename))
     SeqIO.write(sequences, database,"fasta")
 
-    subprocess.call(["makeblastdb","-parse_seqids","-dbtype","nucl",
-        "-in", database,"-out", os.path.splitext(database)[0]])
+    # make blast database
+    cline = ["makeblastdb","-dbtype","nucl","-in",database,"-out",os.path.splitext(database)[0]]
+    print(" ".join(cline))
+    out = subprocess.call(cline)
+    if out != 0:
+        sys.exit()
 
     # blast multifasta
-    cline = NcbiblastnCommandline(query=args.fasta, db=os.path.splitext(database)[0], outfmt=5, out=args.output)
-    print("\nBlast alignment, current time:",time.strftime("%d/%m/%y %H:%M:%S"),file=sys.stderr)
     start = time.time()
-    print(str(cline))
-    cline()
+    print("\nBlast alignment, current time:",time.strftime("%d/%m/%y %H:%M:%S"),file=sys.stderr)
+    cline = ["blastn","-query",args.fasta,"-db",os.path.splitext(database)[0],"-outfmt","5","-out",args.output]
+    print(" ".join(cline + args.blast_opt.split()))
+    out = subprocess.call(cline + args.blast_opt.split())
+    if out != 0:
+        sys.exit()
     print("Completed in",round(time.time()-start,4),"seconds.",file=sys.stderr)
+
+    ## blast multifasta
+    #cline = NcbiblastnCommandline(query=args.fasta, db=os.path.splitext(database)[0], outfmt=5, out=args.output,num_threads=args.num_threads)
+    #print("\nBlast alignment, current time:",time.strftime("%d/%m/%y %H:%M:%S"),file=sys.stderr)
+    #start = time.time()
+    #print(str(cline))
+    #cline()
+    #print("Completed in",round(time.time()-start,4),"seconds.",file=sys.stderr)
             
 if __name__ == "__main__":
     main(sys.argv[1:])
