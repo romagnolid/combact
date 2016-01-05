@@ -32,10 +32,10 @@ def main(args=None):
     with open(args.inlist) as infile:
         for line in infile:
             line = line.split()
-            if len(row) == 1:
-                genomes.append(os.path.basename(os.path.splitext(row[0])[0]))
+            if len(line) == 1:
+                genomes.append(os.path.basename(os.path.splitext(line[0])[0]))
             else:
-                genomes.append(row[1])
+                genomes.append(line[1])
 
     # numeric table of core genomes
     core_genome_csv = open("tag_table.csv","w")
