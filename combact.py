@@ -1,88 +1,182 @@
 #!/usr/bin/env python
-from __future__ import print_function,division
+from __future__ import print_function, division
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 from Bio.Blast import NCBIXML
-from os.path import basename, splitext, join
-from sys import stdout
-import tools
+import argparse
+import os
+import os.path
+import sys
+import csv
+import time
 
-class AlignmentError(Exception):
-    def __init__(self, value):
-        self.parameter = value
-    def __str__(self):
-        return repr(self.parameter)
+def SNP_coding(x,y,report_silent=False):
+    """Return string differences as SNP mutation at protein level"""
+    bases = ['T', 'C', 'A', 'G']
+    codons = [a+b+c for a in bases for b in bases for c in bases]
+    amino_acids = 'FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG'
+    codon_table = dict(zip(codons, amino_acids))
+    start_table = {"TTG":"M","CTG":"M","ATT":"M","ATC":"M","ATA":"M","ATG":"M","GTG":"M"}
 
-def parse_gb_file(infilename, handle_out=stdout, add_igr=False):
-    """Read genebank file and convert it into a multifasta.
-    """
-    record = SeqIO.read(infilename,"gb")
-    sequences = []
+    mutations = []
+    x = x.upper()
+    y = y.upper()
+    x_codons = [x[i:i+3] for i in range(0, len(x)-3+1, 3)]
+    y_codons = [y[i:i+3] for i in range(0, len(y)-3+1, 3)]
 
-    start_igr = 0
-    for feature in record.features:
-        if feature.type in ("CDS","tRNA","rRNA"):
-               end_igr = feature.location.start
-               if end_igr - start_igr > 1 and add_igr:
-                   seq_id = "IGR:[{}:{}]".format(start_igr + 1, end_igr)
-                   seq = record.seq[start_igr:end_igr]
-                   sequences.append(SeqRecord(seq, id=seq_id, description="intergenic region"))
+    for i in range(len(x_codons)):
+        if x_codons[i] != y_codons[i]:
+            if i == 0:
+                a = start_table.get(x_codons[i],"X")
+                b = start_table.get(y_codons[i],"X")
+            else:
+                a = codon_table.get(x_codons[i],"X")
+                b = codon_table.get(y_codons[i],"X")
 
-               locus_tag = feature.qualifiers["locus_tag"][0]
-               seq_desc = feature.qualifiers["product"][0]
-               seq_id = "{}:[{}:{}]:{}".format(feature.type,feature.location.start + 1,feature.location.end,locus_tag)
-               seq = feature.extract(record.seq)
-               sequences.append(SeqRecord(seq,id=seq_id,description=seq_desc))
-               start_igr = feature.location.end
+            if a == b != "X" and report_silent:
+                mutations.append("{}{}{}".format(a, i+1, b))
+            elif a != b == "*":
+                mutations.append("{}{}{}".format(a, i+1, b))
+            elif a != b or a == b == "X":
+                mutations.append("{}{}{}".format(a, i+1, b))
+    return(";".join(mutations))
 
-    end_igr = len(record.seq)
-    if end_igr - start_igr > 1 and add_igr:
-        seq_id = "IGR:[{}:{}]".format(start_igr + 1, end_igr)
-        seq = record.seq[start_igr:end_igr]
-        sequences.append(SeqRecord(seq, id=seq_id, description="intergenic region"))
-    SeqIO.write(sequences, handle_out, "fasta")
+def SNP_non_coding(x,y):
+    """Return string differences as SNP mutation at DNA level"""
+    mutations = []
+    x = x.upper()
+    y = y.upper()
+    i = 0
+    while i < len(x):
+        if x[i] != y[i]:
+            mutated = True
+            j = i
+            i += 1
+            while mutated and i<len(x):
+                if x[i] != y[i]:
+                    i += 1
+                else:
+                    mutations.append("{}{}>{}".format(j+1,x[j:i],y[j:i]))
+                    mutated = False
+                    i += 1
+            if i == len(x):
+                mutations.append("{}{}>{}".format(j+1,x[j:i],y[j:i]))
+        else:
+            i += 1
+    return(";".join(mutations))
 
-def cat_fasta(infilenames, handle_out=stdout):
-    """Concatenate several fasta files into a single multifasta.
-    """
-    if not hasattr(infilenames,"__iter__"):
-        raise TypeError("First argument must be iterable")
+def insertion(x,y):
+    mutations = []
+    x = x.upper()
+    y = y.upper()
+    i = 0
+    l = 0 # nucleotides count (excluding gaps)
+    while i < len(x):
+        if x[i] == "-":
+            j = i
+            has_gap = True
+            i += 1
+            while has_gap:
+                if x[i] != "-":
+                    mutations.append("{}_{}ins{}".format(l,l+1, y[j:i]))
+                    has_gap = False
+                    i += 1
+                    l += 1
+                else:
+                    i += 1
+        else:
+            i += 1
+            l += 1
+    return(";".join(mutations))
 
-    sequences = []
-    for path in infilenames:
-        filename = splitext(basename(path))[0]
-        records = SeqIO.parse(path,"fasta")
-        for i, seq_record in enumerate(records, 1):
-            seq_id = "{}|{}|{}".format(filename, seq_record.id, str(i)) # remove str(i)?
-            sequences.append(SeqRecord(seq_record.seq, id=seq_id))
-    SeqIO.write(sequences, handle_out ,"fasta")
+def deletion(x,y):
+    mutations = []
+    x = x.upper()
+    y = y.upper()
+    i = 0
+    k = 0
+    while i < len(y):
+        if y[i] == "-":
+            j = i
+            has_gap = True
+            i += 1
+            while has_gap:
+                if y[i] != "-":
+                    if (i-j) > 1:
+                        mutations.append(
+                            "{}_{}del{}".format(j+1-k,j+(i-j)-k,x[j:i]))
+                    else:
+                        mutations.append(
+                            "{}del{}".format(j+1-k,x[j:i]))
+                    if x[i] == "-":
+                        k += 1
+                    has_gap = False
+                    i += 1
+                else:
+                    i += 1
+        else:
+            if x[i] == "-":
+                k += 1
+            i += 1
+    return(";".join(mutations))
 
-def get_mutations(infilename, genomes, out_folder="temp", identity_cutoff=80, length_cutoff=70, add_silent=False):
-    sep="\t"
-    header = sep.join(["GeneName"] + genomes)
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="ComBact_0.6.2")
+    parser.add_argument("input",metavar="INPUT_FILE",
+        help="the blast xml output")
+    parser.add_argument("output",metavar="OUTPUT_DIRECTORY",
+        help="the output directory containing the three csv files")
+    parser.add_argument("-i","--inlist",metavar="GENOMES_LIST",default="input_list.txt",
+        help="list of genomes used to make the database [default=\"input_list.txt\"]")
+    parser.add_argument("--silent-mut", action="store_true",
+        help="additionally report silent mutations")
+    parser.add_argument("-L","--length",metavar="CUTOFF",default=70,type=float,dest="len_cutoff",
+        help="percent alignment length cutoff [default=70]")
+    parser.add_argument("-I","--identity",metavar="CUTOFF",default=80,type=float,dest="id_cutoff",
+        help="percent identity cutoff [default=80]")
 
-    handle_full = open(join(out_folder,"full.csv"),"w")
-    handle_nucl = open(join(out_folder,"nucl.csv"),"w")
-    handle_amino = open(join(out_folder,"amino.csv"),"w")
+    args = parser.parse_args(argv)
 
-    print(header,file=handle_full)
-    print(header,file=handle_nucl)
-    print(header,file=handle_amino)
+    start = time.time()
+    print("Compare Bacterial Genomes, current time:",time.strftime("%d/%m/%y %H:%M:%S"))
 
-    all_wt_list = []
-    all_absent_list = []
-    blast_records = NCBIXML.parse(open(infilename))
+    genomes = list()
+    # list of files used for the database
+    with open(args.inlist) as infile:
+        reader = csv.reader(infile,delimiter="\t")
+        for row in reader:
+            if len(row) == 1:
+                genomes.append(os.path.basename(os.path.splitext(row[0])[0]))
+            else:
+                genomes.append(row[1])
+
+    # output folder
+    try:
+        os.mkdir(args.output)
+    except OSError:
+        pass
+
+    full_csv = open(os.path.join(args.output,"full.csv"),"w")
+    full_writer = csv.DictWriter(full_csv, fieldnames=["Gene"] + genomes)
+    full_writer.writeheader()
+
+    nucl_csv = open(os.path.join(args.output,"nucl.csv"),"w")
+    nucl_writer = csv.DictWriter(nucl_csv, fieldnames=["Gene"] + genomes)
+    nucl_writer.writeheader()
+
+    amino_csv = open(os.path.join(args.output,"amino.csv"),"w")
+    amino_writer = csv.DictWriter(amino_csv, fieldnames=["Gene"] + genomes)
+    amino_writer.writeheader()
+
+    blast_records = NCBIXML.parse(open(args.input))
     for blast_record in blast_records:
         query = blast_record.query
         q_len = blast_record.query_length
-        full_array = dict(zip(genomes, [[] for i in range(len(genomes))]))
-        nucl_array = dict(zip(genomes, [[] for i in range(len(genomes))]))
-        amino_array = dict(zip(genomes, [[] for i in range(len(genomes))]))
+        full_hits = {"Gene":query}
+        nucl_hits = {"Gene":query}
+        amino_hits = {"Gene":query}
         for alignment in blast_record.alignments:
-            sbjct = alignment.hit_def.split("|")[0]
-            if full_array.get(sbjct) is None:
-                continue
-    
+            sbjct = alignment.hit_def.split()[-1]
             for hsp in alignment.hsps:
                 q_start = hsp.query_start
                 q_end = hsp.query_end
@@ -91,79 +185,81 @@ def get_mutations(infilename, genomes, out_folder="temp", identity_cutoff=80, le
                 gaps = hsp.gaps
                 q_seq = hsp.query
                 s_seq = hsp.sbjct
-     
-                # short segment: false positive
-                if identity <= identity_cutoff or align_len/q_len*100 <= length_cutoff:
-                    pass
-                
                 # wild-type
-                elif identity == 100 and q_len == align_len:
-                    full_array[sbjct].append("wt")
-                    nucl_array[sbjct].append("wt")
-                    amino_array[sbjct].append("wt")
-    
+                if q_len == align_len and identity == 100:
+                    #print("wt")
+                    full_hits[sbjct] = full_hits.get(sbjct,[]) + ["wt"]
+                    nucl_hits[sbjct] = nucl_hits.get(sbjct,[]) + ["wt"]
+                    amino_hits[sbjct] = amino_hits.get(sbjct,[]) + ["wt"]
                 # SNP
-                elif identity < 100 and gaps == 0:
-                    non_coding = tools.SNP_non_coding(q_seq,s_seq)
-                    nucl_array[sbjct].append("c.["+non_coding+"]")
-
-                    if query.startswith("CDS"):
-                        coding = tools.SNP_coding(q_seq,s_seq,True)
-                        full_array[sbjct].append("c.["+non_coding+"]"+"="+"p.["+coding+"]")
-                        amino_array[sbjct].append("p.["+coding+"]")
+                elif q_len == align_len and gaps == 0 and identity > args.id_cutoff:
+                    #print("snp")
+                    non_coding = SNP_non_coding(q_seq,s_seq)
+                    nucl_hits[sbjct] = nucl_hits.get(sbjct,[]) + ["c.["+non_coding+"]"]
+                    iscds = ("CDS" in query)
+                    if iscds:
+                        coding = SNP_coding(q_seq,s_seq,True)
+                        full_hits[sbjct] = full_hits.get(sbjct,[]) + ["c.["+non_coding+"]"+"="+"p.["+coding+"]"]
+                        if args.silent_mut is True:
+                            amino_hits[sbjct] = amino_hits.get(sbjct,[]) + ["p.["+coding+"]"]
+                        else:
+                            coding = SNP_coding(q_seq,s_seq,False)
+                            if len(coding)>0:
+                                amino_hits[sbjct] = amino_hits.get(sbjct,[]) + ["p.["+coding+"]"]
                     else:
-                        full_array[sbjct].append("c.["+non_coding+"]")
-                        amino_array[sbjct].append("mutated_non_coding_dna")
-    
+                        full_hits[sbjct] = full_hits.get(sbjct,[]) + ["c.["+non_coding+"]"]
+                        amino_hits[sbjct] = amino_hits.get(sbjct,[]) + ["mutant"]
                 # indel
-                elif q_start == 1 and q_end == q_len and gaps > 0:
-                    ins = tools.insertion(q_seq,s_seq)
-                    dels = tools.deletion(q_seq,s_seq)
+                elif q_start == 1 and q_end == q_len and identity > args.id_cutoff: # and gaps > 0 (implicit)
+                    #print("indel")
+                    ins = insertion(q_seq,s_seq)
+                    dels = deletion(q_seq,s_seq)
 
-                    if ins and dels: 
+                    if ins and dels: # empty strings equal to false
                         indels = ins + ";" + dels
                     else:
                         indels = ins + dels
 
-                    full_array[sbjct].append("c.["+indels+"]")
-                    nucl_array[sbjct].append("c.["+indels+"]")
-                    amino_array[sbjct].append("indel")
-    
-                # fragment WT
-                elif (q_start > 1 or q_end < q_len) and identity == 100:
-                    frag = "wt[{}:{}]".format(q_start,q_end)
-                    full_array[sbjct].append(frag)
-                    nucl_array[sbjct].append(frag)
-                    amino_array[sbjct].append(frag)
+                    full_hits[sbjct] = full_hits.get(sbjct,[]) + ["c.["+indels+"]"]
+                    nucl_hits[sbjct] = nucl_hits.get(sbjct,[]) + ["c.["+indels+"]"]
+                    amino_hits[sbjct] = amino_hits.get(sbjct,[]) + [indels]
 
+                # fragment WT
+                elif (q_start > 1 or q_end < q_len) and identity == 100 and align_len/q_len*100 > args.len_cutoff:
+                    frag = "wt[{}:{}]".format(q_start,q_end)
+                    full_hits[sbjct] = full_hits.get(sbjct,[]) + [frag]
+                    nucl_hits[sbjct] = nucl_hits.get(sbjct,[]) + [frag]
+                    amino_hits[sbjct] = amino_hits.get(sbjct,[]) + [frag]
                 # fragment WT
                 elif q_start > 1 or q_end < q_len :
                     frag = "Fragment_mut[{}:{}]".format(q_start,q_end)
-                    full_array[sbjct].append(frag)
-                    nucl_array[sbjct].append(frag)
-                    amino_array[sbjct].append(frag)
-    
+                    full_hits[sbjct] = full_hits.get(sbjct,[]) + [frag]
+                    nucl_hits[sbjct] = nucl_hits.get(sbjct,[]) + [frag]
+                    amino_hits[sbjct] = amino_hits.get(sbjct,[]) + [frag]
+
+                elif align_len/q_len*100 <= args.len_cutoff or identity <= args.id_cutoff:
+                    #print("false_positive")
+                    pass
+
                 # any unforseen mutation
                 else:
-                    raise AlignmentError("Unknown mutation type occuring between " + query + " and " + sbjct)
+                    print("Error: unknown mutation between",query,"and",sbjct,file=sys.stderr)
+                    sys.exit()
 
+        for genome in genomes:
+            if full_hits.has_key(genome):
+                full_hits[genome] = ";".join(full_hits[genome])
+            if nucl_hits.has_key(genome):
+                nucl_hits[genome] = ";".join(nucl_hits[genome])
+            if amino_hits.has_key(genome):
+                amino_hits[genome] = ";".join(amino_hits[genome])
+        full_writer.writerow(full_hits)
+        nucl_writer.writerow(nucl_hits)
+        amino_writer.writerow(amino_hits)
+    full_csv.close()
+    nucl_csv.close()
+    amino_csv.close()
+    print("Completed in",round(time.time()-start,4),"seconds.")
 
-        all_wt = full_array.values().count(["wt"]) == len(full_array.values())
-        all_absent = full_array.values().count([]) == len(full_array.values())
-
-        if all_wt: 
-            all_wt_list.append(query+"\n")
-        elif all_absent:
-            all_absent_list.append(query+"\n")
-        print(sep.join([query] + ["|".join(full_array[sbjct]) for sbjct in genomes]),file=handle_full)
-        print(sep.join([query] + ["|".join(nucl_array[sbjct]) for sbjct in genomes]),file=handle_nucl)
-        print(sep.join([query] + ["|".join(amino_array[sbjct]) for sbjct in genomes]),file=handle_amino)
-
-    handle_full.close()
-    handle_nucl.close()
-    handle_amino.close()
-    with open(join(out_folder, "wild_type.csv"),"w") as wt:
-        wt.writelines(all_wt_list)
-
-    with open(join(out_folder, "absent.csv"),"w") as absent:
-        absent.writelines(all_absent_list)
+if __name__ == "__main__":
+    main(sys.argv[1:])
