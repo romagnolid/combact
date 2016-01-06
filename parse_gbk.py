@@ -60,10 +60,11 @@ def main(args=None):
                 sequence = SeqRecord(seq,id=seq_id,description=record_data)
 
                 if args.tag_list and (tag in tag_list):
+                    #print("{tag} ({typ}): OK".format(tag=tag,typ=feat.type),file=sys.stderr)
                     SeqIO.write(sequence, output, "fasta")
-                elif args.tag_list:
-                    print("Warning:",tag,"[{typ}]".format(typ=feat.type),"not present",file=sys.stderr)
-                else:
+                elif args.tag_list and not (tag in tag_list):
+                    pass
+                elif not args.tag_list:
                     SeqIO.write(sequence, output, "fasta")                
 
                 start_igr = feat.location.end
