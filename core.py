@@ -12,13 +12,13 @@ import sys
 import time
 
 def main(args=None):
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Core_0.1.0")
     parser.add_argument("blastxml",metavar="INPUT_FILE",default="blast.xml",
         help="blast xml output to be parser")
     parser.add_argument("output",metavar="OUTPUT_DIRECTORY",
         help="the output directory containing fasta files of core genomes")
-    parser.add_argument("-i","--inlist",metavar="GENOMES_LIST",default="input_list.txt",
-        help="List of files making the database [default=input_list.txt]")
+    parser.add_argument("-i","--inlist",metavar="GENOMES_LIST",default="inlist.txt",
+        help="List of files making the database [default=inlist.txt]")
     args = parser.parse_args(args)
 
     try:
@@ -27,15 +27,9 @@ def main(args=None):
         for path in os.listdir(args.output):
             os.remove(os.path.join(args.output,path))
 
-    genomes = list()
     # list of files used for the database
     with open(args.inlist) as infile:
-        for line in infile:
-            line = line.split()
-            if len(line) == 1:
-                genomes.append(os.path.basename(os.path.splitext(line[0])[0]))
-            else:
-                genomes.append(line[1])
+        genomes = [os.path.basename(os.path.splitext(line.split()[0])[0]) for line in infile]
 
     # numeric table of core genomes
     core_genome_csv = open("tag_table.csv","w")

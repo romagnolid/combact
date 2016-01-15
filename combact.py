@@ -126,9 +126,9 @@ def main(argv=None):
         help="the blast xml output")
     parser.add_argument("output",metavar="OUTPUT_DIRECTORY",
         help="the output directory containing the three csv files")
-    parser.add_argument("-i","--inlist",metavar="GENOMES_LIST",default="input_list.txt",
-        help="list of genomes used to make the database [default=\"input_list.txt\"]")
-    parser.add_argument("--silent-mut", action="store_true",
+    parser.add_argument("-i","--inlist",metavar="GENOMES_LIST",default="inlist.txt",
+        help="list of genomes used to make the database [default=\"inlist.txt\"]")
+    parser.add_argument("--silent_mut", action="store_true",
         help="additionally report silent mutations")
     parser.add_argument("-L","--length",metavar="CUTOFF",default=70,type=float,dest="len_cutoff",
         help="percent alignment length cutoff [default=70]")
@@ -139,16 +139,12 @@ def main(argv=None):
 
     start = time.time()
     print("Compare Bacterial Genomes, current time:",time.strftime("%d/%m/%y %H:%M:%S"))
+    print("Filters: identity = {id}; length = {len}".format(id=args.id_cutoff,len=args.len_cutoff))
+    if args.silent_mut:
+        print("Report silent mutations")
 
-    genomes = list()
-    # list of files used for the database
     with open(args.inlist) as infile:
-        reader = csv.reader(infile,delimiter="\t")
-        for row in reader:
-            if len(row) == 1:
-                genomes.append(os.path.basename(os.path.splitext(row[0])[0]))
-            else:
-                genomes.append(row[1])
+        genomes = [os.path.basename(os.path.splitext(line.split()[0])[0]) for line in infile]
 
     # output folder
     try:
@@ -177,7 +173,11 @@ def main(argv=None):
         amino_hits = {"Gene":query}
         for alignment in blast_record.alignments:
             sbjct = alignment.hit_def.split()[-1]
-            for hsp in alignment.hsps:
+            if sbjct in nucl_hits:
+                continue
+            for index,hsp in enumerate(alignment.hsps):
+                if index > 0:
+                    break
                 q_start = hsp.query_start
                 q_end = hsp.query_end
                 align_len = hsp.align_length
@@ -232,10 +232,11 @@ def main(argv=None):
                     amino_hits[sbjct] = amino_hits.get(sbjct,[]) + [frag]
                 # fragment WT
                 elif q_start > 1 or q_end < q_len :
-                    frag = "Fragment_mut[{}:{}]".format(q_start,q_end)
-                    full_hits[sbjct] = full_hits.get(sbjct,[]) + [frag]
-                    nucl_hits[sbjct] = nucl_hits.get(sbjct,[]) + [frag]
-                    amino_hits[sbjct] = amino_hits.get(sbjct,[]) + [frag]
+                    pass
+                    #frag = "Fragment_mut[{}:{}]".format(q_start,q_end)
+                    #full_hits[sbjct] = full_hits.get(sbjct,[]) + [frag]
+                    #nucl_hits[sbjct] = nucl_hits.get(sbjct,[]) + [frag]
+                    #amino_hits[sbjct] = amino_hits.get(sbjct,[]) + [frag]
 
                 elif align_len/q_len*100 <= args.len_cutoff or identity <= args.id_cutoff:
                     #print("false_positive")

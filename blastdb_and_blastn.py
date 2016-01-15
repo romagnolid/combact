@@ -17,29 +17,30 @@ def main(argv=None):
         help="multifasta with genes of interest")
     parser.add_argument("output",metavar="OUTPUT_FILE",
         help="blast output filename (format xml)")
-    parser.add_argument("genomes",metavar="INPUT_GENOMES",nargs="*",
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-g","--genomes",metavar="INPUT_GENOMES",nargs="+",
         help="files that will be used to make the database")
-    parser.add_argument("-l","--list",
+    group.add_argument("-i","--inlist",metavar="INPUT_LIST",
         help="list of absolute paths of files that will be used to make the database")
-    parser.add_argument("--blast-opt",type=str,default="",
-        help="additional options for blastn (put them between quotes \"\")")
+    parser.add_argument("--blastn",type=str,default="",
+        help="additional options for blastn (between quotes \"\")")
+    parser.add_argument("--makeblastdb",type=str,default="",
+        help="additional options for blastn (between quotes \"\")")
     args = parser.parse_args(argv)
-    
+
     if args.genomes:
-        filespaths = args.genomes
-        with open("input_list.txt", "w") as inlist:
-            genomes = [os.path.splitext(os.path.basename(path))[0] for path in filespaths]
-            writer = csv.writer(inlist,delimiter="\t")
-            for i in range(len(genomes)):
-                writer.writerow([os.path.abspath(filespaths[i]), genomes[i]])
-    else:
-        with open(args.list) as inlist:
-            reader = csv.reader(inlist,delimiter="\t")
-            filespaths = []
-            genomes = []
-            for row in reader:
-                filespaths.append(row[0])
-                genomes.append(row[1])
+        # create inlist to be used later
+        paths = args.genomes
+        names = [os.path.splitext(os.path.basename(path))[0] for path in paths]
+        print(paths,names)
+        genomes = zip(paths, names)
+        with open("inlist.txt", "w") as infile:
+            infile.writelines(["{str}\n".format(str=name) for name in names])
+    elif args.inlist:
+        with open(args.inlist) as infile:
+            paths = [line.split()[0] for line in infile]
+            names = [os.path.splitext(os.path.basename(path))[0] for path in paths]
+            genomes = zip(paths,names)
 
     # create database directory
     database = os.path.join(os.getcwd(),"Database","database.fa")
@@ -60,8 +61,8 @@ def main(argv=None):
 
     # make blast database
     cline = ["makeblastdb","-dbtype","nucl","-in",database,"-out",os.path.splitext(database)[0]]
-    print(" ".join(cline))
-    out = subprocess.call(cline)
+    print(" ".join(cline + args.makeblastdb.split()))
+    out = subprocess.call(cline + args.makeblastdb.split())
     if out != 0:
         sys.exit()
 
@@ -69,19 +70,11 @@ def main(argv=None):
     start = time.time()
     print("\nBlast alignment, current time:",time.strftime("%d/%m/%y %H:%M:%S"),file=sys.stderr)
     cline = ["blastn","-query",args.fasta,"-db",os.path.splitext(database)[0],"-outfmt","5","-out",args.output]
-    print(" ".join(cline + args.blast_opt.split()))
-    out = subprocess.call(cline + args.blast_opt.split())
+    print(" ".join(cline + args.blastn.split()))
+    out = subprocess.call(cline + args.blastn.split())
     if out != 0:
         sys.exit()
     print("Completed in",round(time.time()-start,4),"seconds.",file=sys.stderr)
 
-    ## blast multifasta
-    #cline = NcbiblastnCommandline(query=args.fasta, db=os.path.splitext(database)[0], outfmt=5, out=args.output,num_threads=args.num_threads)
-    #print("\nBlast alignment, current time:",time.strftime("%d/%m/%y %H:%M:%S"),file=sys.stderr)
-    #start = time.time()
-    #print(str(cline))
-    #cline()
-    #print("Completed in",round(time.time()-start,4),"seconds.",file=sys.stderr)
-            
 if __name__ == "__main__":
     main(sys.argv[1:])
