@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import print_function
+from __future__ import print_function, division
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.Blast import NCBIXML
@@ -36,22 +36,20 @@ def main(args=None):
     writer = csv.DictWriter(core_genome_csv, fieldnames=["Locus tag"]+genomes)
     writer.writeheader()
 
+    # parse blastXML
     print("Parsing blast XML output, current time:",time.strftime("%d/%m/%y %H:%M:%S"),file=sys.stderr)
     start = time.time()
-    # parse blastXML
     records = NCBIXML.parse(open(args.blastxml))
     # check whether a genome has a specific gene
     for record in records:
-        #print("Parsing {rec} record".format(rec=record.query),file=sys.stderr)
         hits = dict.fromkeys(genomes,0)
         for align in record.alignments:
             for hsp in align.hsps:
-                if hsp.align_length >= record.query_length:
-                    genome = align.hit_def.split()[-1] 
+                genome = align.hit_def.split()[-1] 
+                if (hsp.identities/hsp.align_length >= 0.9) and (hsp.align_length >= record.query_length) and (genome in hits):
                     hits[genome] += 1
         # if present in all is core
         if all([value>0 for value in hits.values()]):
-            #print(record.query,"is core",file=sys.stderr)
             identities = {}
             sequences = {}
             for align in record.alignments:
