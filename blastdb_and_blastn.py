@@ -32,7 +32,6 @@ def main(argv=None):
         # create inlist to be used later
         paths = args.genomes
         names = [os.path.splitext(os.path.basename(path))[0] for path in paths]
-        print(paths,names)
         genomes = zip(paths, names)
         with open("inlist.txt", "w") as infile:
             infile.writelines(["{str}\n".format(str=name) for name in names])
@@ -51,7 +50,7 @@ def main(argv=None):
 
     # concatenate all fastas
     sequences = []
-    for path in filespaths:
+    for path in paths:
         genomename = os.path.splitext(os.path.basename(path))[0]
         records = SeqIO.parse(path,"fasta")
         for record in records:

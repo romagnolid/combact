@@ -14,25 +14,28 @@ import time
 def main(args=None):
     parser = argparse.ArgumentParser(description="Core_0.1.0")
     parser.add_argument("blastxml",metavar="INPUT_FILE",default="blast.xml",
-        help="blast xml output to be parser")
-    parser.add_argument("output",metavar="OUTPUT_DIRECTORY",
+        help="the blast xml output to be parsed")
+    parser.add_argument("outfile",metavar="OUTPUT_FILE",
+        help="the output table reporting the presence of a gene")
+    parser.add_argument("-o","--output",metavar="OUTPUT_DIRECTORY",
         help="the output directory containing fasta files of core genomes")
     parser.add_argument("-i","--inlist",metavar="GENOMES_LIST",default="inlist.txt",
         help="List of files making the database [default=inlist.txt]")
     args = parser.parse_args(args)
 
-    try:
-        os.mkdir(args.output)
-    except OSError:
-        for path in os.listdir(args.output):
-            os.remove(os.path.join(args.output,path))
+    if args.output:
+        try:
+            os.mkdir(args.output)
+        except OSError:
+            for path in os.listdir(args.output):
+                os.remove(os.path.join(args.output,path))
 
     # list of files used for the database
     with open(args.inlist) as infile:
         genomes = [os.path.basename(os.path.splitext(line.split()[0])[0]) for line in infile]
 
     # numeric table of core genomes
-    core_genome_csv = open("tag_table.csv","w")
+    core_genome_csv = open(args.outfile,"w")
     writer = csv.DictWriter(core_genome_csv, fieldnames=["Locus tag"]+genomes)
     writer.writeheader()
 
@@ -42,14 +45,17 @@ def main(args=None):
     records = NCBIXML.parse(open(args.blastxml))
     # check whether a genome has a specific gene
     for record in records:
+        print(record.query)
         hits = dict.fromkeys(genomes,0)
         for align in record.alignments:
             for hsp in align.hsps:
                 genome = align.hit_def.split()[-1] 
-                if (hsp.identities/hsp.align_length >= 0.9) and (hsp.align_length >= record.query_length) and (genome in hits):
+                print(genome, hsp.align_length, record.query_length)
+                if (hsp.align_length >= record.query_length) and (genome in hits):
                     hits[genome] += 1
+        # write sequences
         # if present in all is core
-        if all([value>0 for value in hits.values()]):
+        if args.output and all([value>0 for value in hits.values()]):
             identities = {}
             sequences = {}
             for align in record.alignments:
