@@ -1,15 +1,12 @@
-#ComBact README
-ComBact (Compare Bacterial genomes) highlights genetic differences between multiple bacterial strains of the same species (high sequences similarity is required).
+#ComBact
+ComBact (Compare Bacteria) highlights genetic differences between multiple bacterial strains of the same species (high sequences similarity is required).
 
-## Requirements
-The following software are required:
+## Prerequisites
+To use ComBact, you will need [NCBI Blast+] (http://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE_TYPE=BlastDocs&DOC_TYPE=Download) in your path.
 
-* [Python] (https://www.python.org/downloads)
-* [Biopython] (https://pypi.python.org/pypi/biopython)
-* [NCBI Blast+] (http://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE_TYPE=BlastDocs&DOC_TYPE=Download)
+You will also need [Python] (https://www.python.org/downloads) version 2.6 or higher and [Biopython] (https://pypi.python.org/pypi/biopython).
 
 ## Installation
 1. Download and decompress the zip archive.
 
-2. Include folder path to your $PATH variable using
-`export PATH=/path/to/combact:$PATH`
+2. Add ComBact folder to your PATH
