@@ -25,7 +25,7 @@ def main(argv=None):
     parser.add_argument("--blastn",type=str,default="",
         help="additional options for blastn (between quotes \"\")")
     parser.add_argument("--makeblastdb",type=str,default="",
-        help="additional options for blastn (between quotes \"\")")
+        help="additional options for makeblastdb (between quotes \"\")")
     args = parser.parse_args(argv)
 
     if args.genomes:
@@ -34,7 +34,7 @@ def main(argv=None):
         names = [os.path.splitext(os.path.basename(path))[0] for path in paths]
         genomes = zip(paths, names)
         with open("inlist.txt", "w") as infile:
-            infile.writelines(["{str}\n".format(str=name) for name in names])
+            infile.writelines(["{string}\n".format(string=name) for name in names])
     elif args.inlist:
         with open(args.inlist) as infile:
             paths = [line.split()[0] for line in infile]
@@ -43,10 +43,8 @@ def main(argv=None):
 
     # create database directory
     database = os.path.join(os.getcwd(),"Database","database.fa")
-    try:
+    if not os.path.isdir("Database"):
         os.mkdir("Database")
-    except OSError:
-        pass
 
     # concatenate all fastas
     sequences = []
@@ -59,21 +57,17 @@ def main(argv=None):
     SeqIO.write(sequences, database,"fasta")
 
     # make blast database
-    cline = ["makeblastdb","-dbtype","nucl","-in",database,"-out",os.path.splitext(database)[0]]
+    cline = ["makeblastdb","-parse_seqids","-dbtype","nucl","-in",database,"-out",os.path.splitext(database)[0]]
     print(" ".join(cline + args.makeblastdb.split()))
     out = subprocess.call(cline + args.makeblastdb.split())
-    if out != 0:
-        sys.exit()
 
     # blast multifasta
     start = time.time()
-    print("\nBlast alignment, current time:",time.strftime("%d/%m/%y %H:%M:%S"),file=sys.stderr)
+    print("\nBlast alignment, current time:",time.strftime("%d/%m/%y %H:%M:%S"))
     cline = ["blastn","-query",args.fasta,"-db",os.path.splitext(database)[0],"-outfmt","5","-out",args.output]
     print(" ".join(cline + args.blastn.split()))
     out = subprocess.call(cline + args.blastn.split())
-    if out != 0:
-        sys.exit()
-    print("Completed in",round(time.time()-start,4),"seconds.",file=sys.stderr)
+    print("Completed in",round(time.time()-start,4),"seconds.")
 
 if __name__ == "__main__":
     main(sys.argv[1:])
