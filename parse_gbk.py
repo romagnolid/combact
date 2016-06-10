@@ -54,7 +54,7 @@ def main(args=None):
     for record in records:
         start_igr = 0
         for feat in record.features:
-            if feat.type in ("CDS","tRNA","rRNA") and feat.qualifiers.has_key("locus_tag"):
+            if feat.type in ("CDS","tRNA","rRNA"):# and feat.qualifiers.has_key("locus_tag"):
                 # IGR
                 end_igr = feat.location.start
                 if (end_igr - start_igr > 0) and args.igr:
@@ -67,21 +67,20 @@ def main(args=None):
                     SeqIO.write(sequence, output, "fasta")
 
                 # GENE
-                tag = feat.qualifiers["locus_tag"][0]
-                seq_id = "{tag}|{s}:{e}:{strand}|{typ}| {description}".format(
+                seq_id = "{tag}|{s}:{e}:{strand}|{typ}| {gene_name}:".format(
                     strand=strand_dict[feat.strand], 
-                    tag=feat.qualifiers["locus_tag"][0], 
+                    tag=feat.qualifiers.get("locus_tag",["unknown_tag"])[0], 
                     s=feat.location.start+1, 
                     e=feat.location.end, 
                     typ=feat.type,
-                    description=feat.qualifiers.get("gene",[""])[0])
+                    gene_name=feat.qualifiers.get("gene",["unknown_gene"])[0])
                 #pre = record.seq[feat.location.start-9:feat.location.start].lower()
                 #post = record.seq[feat.location.end:feat.location.end+9].lower()
                 seq = record.seq[feat.location.start:feat.location.end]
                 #seq = feat.extract(record.seq)
 
                 sequence = SeqRecord(seq, id=seq_id,
-                    description=feat.qualifiers.get("product",[""])[0])
+                    description=feat.qualifiers.get("product",["unknown_product"])[0])
 
                 if args.list and (tag in tag_list):
                     SeqIO.write(sequence, output, "fasta")
