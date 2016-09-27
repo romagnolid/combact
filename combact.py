@@ -6,6 +6,8 @@ import os.path
 import sys
 import csv
 import time
+import logging
+
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -120,7 +122,7 @@ def deletion(x,y):
     return(";".join(mutations))
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="ComBact-0.7.0")
+    parser = argparse.ArgumentParser(description="ComBact-0.7.1")
     parser.add_argument("input",metavar="INPUT_FILE",
         help="the blast.xml output")
     parser.add_argument("output",metavar="OUTPUT_DIRECTORY",
@@ -151,7 +153,7 @@ def main(argv=None):
         genomes = [os.path.basename(os.path.splitext(line.split()[0])[0]) for line in infile]
 
     # output folder
-    if not os.path.exists(args.output):
+    if not os.path.exists(args.output)(
         os.mkdir(args.output)
 
     if args.binary and not os.path.exists(args.output+"/CoreGenomes"):
@@ -270,8 +272,8 @@ def main(argv=None):
                     if gaps == 0:
                         #print(query)
                         non_coding = snp_non_coding(q_seq,s_seq,k=q_start)
-                        nucl_hits[sbjct] = "c.[{}][{}:{}]".format(q_start,q_end,non_coding)
-                        full_hits[sbjct] = "c.[{}][{}:{}]".format(q_start,q_end,non_coding)
+                        nucl_hits[sbjct] = "c.({}:{})[{}]".format(q_start,q_end,non_coding)
+                        full_hits[sbjct] = "c.({}:{})[{}]".format(q_start,q_end,non_coding)
 
                 elif align_len/q_len*100 <= args.len_cutoff or identity <= args.id_cutoff:
                     pass
