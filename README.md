@@ -1,6 +1,7 @@
 # Updates
-* ComBact 0.7.1 27/09/2016
-  * Corrected mutation report for partial alignments: c.(START:END)[mutations]
+* ComBact 0.7.2 27/09/2016: 
+    * corrected mutation report for partial alignments
+
 ---
 #ComBact
 ComBact (Compare Bacteria) highlights genetic differences between multiple bacterial strains of the same species (high sequences similarity is required).
