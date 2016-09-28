@@ -122,7 +122,7 @@ def deletion(x,y):
     return(";".join(mutations))
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="ComBact-0.7.1")
+    parser = argparse.ArgumentParser(description="ComBact-0.7.2")
     parser.add_argument("input",metavar="INPUT_FILE",
         help="the blast.xml output")
     parser.add_argument("output",metavar="OUTPUT_DIRECTORY",
