@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 from __future__ import print_function
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
@@ -13,19 +13,19 @@ import csv
 
 def main(argv=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument("fasta",metavar="INPUT_FILE",
+    parser.add_argument("fasta", metavar="INPUT_FILE",
         help="multifasta with genes of interest")
-    parser.add_argument("output",metavar="OUTPUT_FILE",
+    parser.add_argument("output", metavar="OUTPUT_FILE",
         help="blast output filename (format xml)")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("-g","--genomes",metavar="INPUT_GENOMES",nargs="+",
+    group.add_argument("-g", "--genomes", metavar="INPUT_GENOMES", nargs="+",
         help="files that will be used to make the database")
-    group.add_argument("-i","--inlist",metavar="INPUT_LIST",
+    group.add_argument("-i", "--inlist", metavar="INPUT_LIST",
         help="list of absolute paths of files that will be used to make the database")
-    parser.add_argument("--blastn",type=str,default="",
-        help="additional options for blastn (between quotes \"\")")
-    parser.add_argument("--makeblastdb",type=str,default="",
+    parser.add_argument("--makeblastdb", type=str, default="",
         help="additional options for makeblastdb (between quotes \"\")")
+    parser.add_argument("--blastn", type=str, default="",
+        help="additional options for blastn (between quotes \"\")")
     args = parser.parse_args(argv)
 
     if args.genomes:
@@ -39,10 +39,10 @@ def main(argv=None):
         with open(args.inlist) as infile:
             paths = [line.split()[0] for line in infile]
             names = [os.path.splitext(os.path.basename(path))[0] for path in paths]
-            genomes = zip(paths,names)
+            genomes = zip(paths, names)
 
     # create database directory
-    database = os.path.join(os.getcwd(),"Database","database.fa")
+    database = os.path.join(os.getcwd(), "Database", "database.fa")
     if not os.path.isdir("Database"):
         os.mkdir("Database")
 
@@ -50,24 +50,24 @@ def main(argv=None):
     sequences = []
     for path in paths:
         genomename = os.path.splitext(os.path.basename(path))[0]
-        records = SeqIO.parse(path,"fasta")
+        records = SeqIO.parse(path, "fasta")
         for record in records:
-            sequences.append(SeqRecord(record.seq,id=record.id,
+            sequences.append(SeqRecord(record.seq, id=record.id,
                 description=genomename))
-    SeqIO.write(sequences, database,"fasta")
+    SeqIO.write(sequences, database, "fasta")
 
     # make blast database
-    cline = ["makeblastdb","-parse_seqids","-dbtype","nucl","-in",database,"-out",os.path.splitext(database)[0]]
+    cline = ["makeblastdb", "-parse_seqids", "-dbtype", "nucl", "-in", database, "-out", os.path.splitext(database)[0]]
     print(" ".join(cline + args.makeblastdb.split()))
     out = subprocess.call(cline + args.makeblastdb.split())
 
     # blast multifasta
     start = time.time()
-    print("\nBlast alignment, current time:",time.strftime("%d/%m/%y %H:%M:%S"))
-    cline = ["blastn","-query",args.fasta,"-db",os.path.splitext(database)[0],"-outfmt","5","-out",args.output]
+    print("\nBlast alignment, current time:", time.strftime("%d/%m/%y %H:%M:%S"))
+    cline = ["blastn", "-query", args.fasta, "-db", os.path.splitext(database)[0], "-outfmt", "5", "-out", args.output]
     print(" ".join(cline + args.blastn.split()))
     out = subprocess.call(cline + args.blastn.split())
-    print("Completed in",round(time.time()-start,4),"seconds.")
+    print("Completed in", round(time.time()-start,4), "seconds.")
 
 if __name__ == "__main__":
     main(sys.argv[1:])

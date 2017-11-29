@@ -1,5 +1,3 @@
-.DC_Store
-*.nhr
-*.nin
-*.nsq
-*.pyc
+images/
+Testing/
+.Rproj.user
