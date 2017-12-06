@@ -21,11 +21,11 @@ def snp_coding(x, y, k=1, print_silent=False):
     """Return a string of SNPs at protein level"""
 
     mutations = []
-    # don't use cds option: it removes stop codon *;
-    # it throws error both if start is not start codon or last is not end codon
-    # better check if first codon is start codon ecc.
     x_amino = Seq(x, generic_dna).translate(table=11)
     y_amino = Seq(y, generic_dna).translate(table=11)
+    # do not use cds option: it removes stop codon *;
+    # it throws error both if first codon is not a start codon or last codon is not end codon
+    # better check if first codon is start codon ecc.
 
     x_codons = [x[i:i+3] for i in range(0, len(x)-3+1, 3)]
     y_codons = [y[i:i+3] for i in range(0, len(y)-3+1, 3)]
