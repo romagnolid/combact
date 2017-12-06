@@ -70,7 +70,7 @@ def main(argv=None):
     print(" ".join(cline + args.blastn.split()))
     out = subprocess.call(cline)
 
-    print("Completed in", round(time.time()-start, 4), "seconds.")
+    print("Completed in {:d} seconds.".format(int(round(time.time()-start))))
 
 if __name__ == "__main__":
     main(sys.argv[1:])

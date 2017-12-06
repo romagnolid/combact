@@ -265,7 +265,7 @@ def main(argv=None):
     nucl_tsv.close()
     amino_tsv.close()
 
-    print("Completed in", round(time.time()-start, 4), "seconds.")
+    print("Completed in {:d} seconds.".format(int(round(time.time()-start))))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
