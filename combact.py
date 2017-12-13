@@ -38,9 +38,13 @@ def snp_coding(x, y, k=1, print_silent=False):
         # silent
         for i in ind:
             if x_amino[i] == y_amino[i] and print_silent:
-                mutations.append("{x}{i}{y}".format(i=i+k, x=x_amino[i], y=y_amino[i]))
+                mutations.append("{x}{i}{y}".format(i=i+k,
+                                                    x=x_amino[i],
+                                                    y=y_amino[i]))
             else:
-                mutations.append("{x}{i}{y}".format(i=i+k, x=x_amino[i], y=y_amino[i]))
+                mutations.append("{x}{i}{y}".format(i=i+k,
+                                                    x=x_amino[i],
+                                                    y=y_amino[i]))
 
     return(";".join(mutations))
 
@@ -63,7 +67,9 @@ def snp_non_coding(x, y, k=1):
         else:
             # e.g. "c.112_117delAGGTCAinsTG"
             mutations.append(
-                "{i}_{j}del{x}ins{y}".format(i=i[0]+k, j=i[-1]+k, x=x[i[0]:i[-1]+1], y=y[i[0]:i[-1]+1]))
+                "{i}_{j}del{x}ins{y}".format(i=i[0]+k, j=i[-1]+k,
+                                             x=x[i[0]:i[-1]+1],
+                                             y=y[i[0]:i[-1]+1]))
     return(";".join(mutations))
 
 def insertion(x, y):
@@ -132,10 +138,13 @@ def main(argv=None):
         help="list of genome alignments to be parsed")
     parser.add_argument("--silent_mut", action="store_true",
         help="report silent mutations")
-    parser.add_argument("-L", "--length", metavar="CUTOFF", default=0, type=float, dest="len_cutoff",
-        help="percent alignment length cutoff [default=0]")
-    parser.add_argument("-I", "--identity", metavar="CUTOFF", default=0, type=float, dest="id_cutoff",
-        help="percent identity cutoff [default=0]")
+    parser.add_argument("-L", "--length", metavar="LENGTH_CUTOFF", default=0,
+        type=float, dest="len_cutoff",
+        percentage of gene sequence aligned minimum cutoff
+        help="minimum length (as percentage of query length) to report mutations [default=0]")
+    parser.add_argument("-I", "--identity", metavar="IDENTITY_CUTOFF", default=0,
+        type=float, dest="id_cutoff",
+        help="minimum identity (as percentage of query matches) to report mutations [default=0]")
 
     args = parser.parse_args(argv)
 
@@ -183,7 +192,6 @@ def main(argv=None):
         for alignment in blast_record.alignments:
             sbjct = alignment.accession
             if (sbjct in genomes):
-            # if (sbjct not in nucl_hits):
                 hsp = alignment.hsps[0] #high scoring pair
                 q_start = hsp.query_start
                 q_end = hsp.query_end
@@ -194,7 +202,7 @@ def main(argv=None):
                 s_seq = hsp.sbjct
 
                 # wild-type
-                if q_len == align_len and identity == 100:
+                if (q_len == align_len and identity == 100):
                     full_hits[sbjct]  = "wt"
                     nucl_hits[sbjct]  = "wt"
                     amino_hits[sbjct] = "wt"
@@ -225,7 +233,7 @@ def main(argv=None):
                     ins = insertion(q_seq, s_seq)
                     dels = deletion(q_seq, s_seq)
 
-                    if ins and dels: # empty strings equal to false
+                    if (ins and dels): # an empty string is equal to false
                         indels = ins + ";" + dels
                     else:
                         indels = ins + dels
@@ -235,7 +243,8 @@ def main(argv=None):
                     amino_hits[sbjct] = "indels"
 
                 # fragment WT
-                elif (q_start > 1 or q_end < q_len) and identity == 100 and align_len/q_len*100 > args.len_cutoff:
+                elif ((q_start > 1 or q_end < q_len) and identity == 100 and
+                      align_len/q_len*100 > args.len_cutoff):
                     frag = "wt[{}:{}]".format(q_start, q_end)
                     full_hits[sbjct]  = frag
                     nucl_hits[sbjct]  = frag
@@ -244,17 +253,18 @@ def main(argv=None):
                 # fragment mutant
                 elif (q_start > 1 or q_end < q_len) and align_len/q_len*100 > args.len_cutoff:
                     # snps only
-                    if gaps == 0:
-                        #print(query)
+                    if (gaps == 0):
                         non_coding = snp_non_coding(q_seq, s_seq, k=q_start)
                         nucl_hits[sbjct] = "c.({}:{})[{}]".format(q_start, q_end, non_coding)
                         full_hits[sbjct] = "c.({}:{})[{}]".format(q_start, q_end, non_coding)
 
-                elif align_len/q_len*100 <= args.len_cutoff or identity <= args.id_cutoff:
+                # below identity or length thresholds
+                elif (align_len/q_len*100 <= args.len_cutoff or identity <= args.id_cutoff):
                     pass
 
                 else: # debugging purpose: any unforseen mutation
-                    print("Error: unknown mutation between", query, "and", sbjct, file=sys.stderr)
+                    print("Error: unknown mutation between {} and {}".format(query, sbjct),
+                        file=sys.stderr)
                     sys.exit()
 
         full_writer.writerow(full_hits)
