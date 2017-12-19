@@ -140,7 +140,6 @@ def main(argv=None):
         help="report silent mutations")
     parser.add_argument("-L", "--length", metavar="LENGTH_CUTOFF", default=0,
         type=float, dest="len_cutoff",
-        percentage of gene sequence aligned minimum cutoff
         help="minimum length (as percentage of query length) to report mutations [default=0]")
     parser.add_argument("-I", "--identity", metavar="IDENTITY_CUTOFF", default=0,
         type=float, dest="id_cutoff",
