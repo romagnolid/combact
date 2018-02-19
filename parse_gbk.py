@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 
 from __future__ import print_function
 from Bio import SeqIO
@@ -56,7 +56,7 @@ def main(args=None):
                 # IGR
                 end_igr = feat.location.start
                 if (end_igr - start_igr > 0) and args.igr:
-                    seq_id = "igr_{n:0>4}|{s}:{e}".format(n=n_igr, s=start_igr+1, e=end_igr)
+                    seq_id = "igr_{n:0>5}|{s}:{e}".format(n=n_igr, s=start_igr+1, e=end_igr)
                     seq = record.seq[start_igr:end_igr]
                     sequence = SeqRecord(seq, id=seq_id, description="")
                     SeqIO.write(sequence, output, "fasta")
@@ -84,7 +84,7 @@ def main(args=None):
 
         end_igr = len(record.seq)
         if (end_igr - start_igr > 0) and args.igr:
-            seq_id = "igr_{n:0>4}|{s}:{e}".format(n=n_igr, s=start_igr+1, e=end_igr)
+            seq_id = "igr_{n:0>5}|{s}:{e}".format(n=n_igr, s=start_igr+1, e=end_igr)
             seq = record.seq[start_igr:end_igr]
             sequence = SeqRecord(seq, id=seq_id, description="")
             SeqIO.write(sequence, output, "fasta")

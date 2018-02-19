@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 
 from __future__ import print_function
 from Bio import SeqIO
@@ -13,11 +13,11 @@ import csv
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="ComBact-0.8")
-    parser.add_argument("fasta", metavar="INPUT_FILE",
+    parser.add_argument("-i", "--input-file", metavar="INPUT_FILE", required = True,
         help="multifasta with genes of interest")
-    parser.add_argument("output", metavar="OUTPUT_FILE",
-        help="blast output filename (with out extention)")
-    parser.add_argument("-i", "--input_list", metavar="INPUT_LIST", required = True, 
+    parser.add_argument("-o", "--output-name", metavar="OUTPUT_NAME", required = True,
+        help="blast output filename (with out ext)")
+    parser.add_argument("-l", "--list", metavar="INPUT_LIST", required = True, 
         help="list of absolute file paths of genomes to be used as database")
     parser.add_argument("-d", "--database", metavar="DATABASE_DIRECTORY",
         default = "database",
@@ -28,10 +28,8 @@ def main(argv=None):
         help="additional options for blastn (between quotes \"\")")
     args = parser.parse_args(argv)
 
-    with open(args.input_list) as infile:
+    with open(args.list) as infile:
         paths = [line.split()[0] for line in infile]
-        names = [os.path.splitext(os.path.basename(path))[0] for path in paths]
-        genomes = zip(paths, names)
 
     # create database directory
     database = os.path.join(os.getcwd(), args.database, 
@@ -59,14 +57,14 @@ def main(argv=None):
     print("\nBlast alignment, current time:", time.strftime("%d/%m/%y %H:%M:%S"))
 
     # output format asn
-    cline = ["blastn", "-query", args.fasta, "-db", os.path.splitext(database)[0],
-        "-outfmt", "11", "-out", args.output + ".asn"]
+    cline = ["blastn", "-query", args.input_file, "-db", os.path.splitext(database)[0],
+        "-outfmt", "11", "-out", args.output_name + ".asn"]
     print(" ".join(cline + args.blastn.split()))
     out = subprocess.call(cline + args.blastn.split())
 
     # output format xml (for parsing)
-    cline = ["blast_formatter", "-archive", args.output + ".asn",
-        "-outfmt", "5", "-out", args.output + ".xml"]
+    cline = ["blast_formatter", "-archive", args.output_name + ".asn",
+        "-outfmt", "5", "-out", args.output_name + ".xml"]
     print(" ".join(cline + args.blastn.split()))
     out = subprocess.call(cline)
 
