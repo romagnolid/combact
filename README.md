@@ -1,5 +1,4 @@
 ## ComBact 0.8
-========================================================================
 ComBact (Compare Bacteria) is a set of python scripts to highlight genetic
 differences between multiple bacterial strains of the same species (high
 sequences similarity is required).
@@ -54,6 +53,3 @@ avoid reporting genes/fragments with alignment scores below given thresholds.
 - SNP: c.[64C>T;102T>G]
 - INDEL: c.[64_66delG;102T>G]
 - FRAGMENT: c.[64C>T;102T>G](25:104)
-
-## Get help
-Use *`-h/--help`*
