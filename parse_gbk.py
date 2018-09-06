@@ -12,8 +12,8 @@ import time
 strand_dict = {1:"+", -1:"-"}
 
 def main(args=None):
-    parser = argparse.ArgumentParser(description="ComBact-0.8")
-    parser.add_argument("genbank", metavar="INPUT_FILE",
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--input", metavar="INPUT_FILE",
         help="the genbank input file")
     parser.add_argument("output", metavar="OUTPUT_FILE",
         help="the output fasta file")
@@ -23,10 +23,11 @@ def main(args=None):
         help="extract intergenic regions")
     parser.add_argument("--embl", action="store_true",
         help="parse from embl flat format file instead of genbank")
+    parser.add_argument("-v", "--version", action="version", version="%(prog)s 0.8")
 
     args = parser.parse_args(args)
 
-    print("Parsing genbank, current time:", time.strftime("%d/%m/%y %H:%M:%S"))
+    print("Parsing genbank/embl input file, current time:", time.strftime("%d/%m/%y %H:%M:%S"))
     start = time.time()
 
     if args.output:
@@ -44,9 +45,9 @@ def main(args=None):
 
     sequences = []
     if args.embl:
-        records = SeqIO.parse(args.genbank, "embl")
+        records = SeqIO.parse(args.input, "embl")
     else:
-        records = SeqIO.parse(args.genbank, "gb")
+        records = SeqIO.parse(args.input, "gb")
 
     for record in records:
         start_igr = 0

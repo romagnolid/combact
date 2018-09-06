@@ -12,27 +12,30 @@ import sys
 import csv
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="ComBact-0.8")
-    parser.add_argument("-i", "--input-file", metavar="INPUT_FILE", required = True,
-        help="multifasta with genes of interest")
-    parser.add_argument("-o", "--output-name", metavar="OUTPUT_NAME", required = True,
-        help="blast output filename (with out ext)")
-    parser.add_argument("-l", "--list", metavar="INPUT_LIST", required = True, 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--input-file", metavar="INPUT_FILE",
+            required = True, help="multifasta with genes of interest")
+    parser.add_argument("-o", "--output-name", metavar="OUTPUT_NAME",
+            required = True, help="blast output filename (with out ext)")
+    parser.add_argument("-l", "--list", metavar="INPUT_LIST", required = True,
         help="list of absolute file paths of genomes to be used as database")
     parser.add_argument("-d", "--database", metavar="DATABASE_DIRECTORY",
-        default = "database",
-        help="directory where database will be stored (default = 'database'")
+            default = "database",
+            help="directory where database will be stored (default = 'database'")
+    parser.add_argument("-n", "--num-threads", metavar="CORES", default=1, type=int,
+            help="number of CPUs to use in the BLAST search (default = 1)")
     parser.add_argument("--makeblastdb", type=str, default="",
-        help="additional options for makeblastdb (between quotes \"\")")
+        help="additional options for makeblastdb (put inside quotes \"\")")
     parser.add_argument("--blastn", type=str, default="",
-        help="additional options for blastn (between quotes \"\")")
+        help="additional options for blastn (put inside quotes \"\")")
+    parser.add_argument("-v", "--version", action="version", version="%(prog)s 0.8")
     args = parser.parse_args(argv)
 
     with open(args.list) as infile:
         paths = [line.split()[0] for line in infile]
 
     # create database directory
-    database = os.path.join(os.getcwd(), args.database, 
+    database = os.path.join(os.getcwd(), args.database,
         os.path.basename(args.database) + ".fa")
     if not os.path.isdir(args.database):
         os.mkdir(args.database)
@@ -58,7 +61,7 @@ def main(argv=None):
 
     # output format asn
     cline = ["blastn", "-query", args.input_file, "-db", os.path.splitext(database)[0],
-        "-outfmt", "11", "-out", args.output_name + ".asn"]
+        "-outfmt", "11", "-out", args.output_name + ".asn", "-num_threads", str(args.num_threads)]
     print(" ".join(cline + args.blastn.split()))
     out = subprocess.call(cline + args.blastn.split())
 

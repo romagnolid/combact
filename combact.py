@@ -9,9 +9,7 @@ import csv
 import time
 import logging
 
-from Bio import SeqIO
 from Bio.Seq import Seq
-from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import generic_dna
 from Bio.Blast import NCBIXML
 
@@ -35,7 +33,6 @@ def snp_coding(x, y, k=1, print_silent=False):
     indexes = [i for i in range(len(x_codons)) if x_codons[i] != y_codons[i]]
     for (h, g) in groupby(enumerate(indexes), lambda (i, x): i-x):
         ind = map(itemgetter(1), g)
-
         for i in ind:
             # silent mutations
             if (x_amino[i] == y_amino[i] and print_silent):
@@ -131,12 +128,12 @@ def deletion(x, y):
     return(mutations)
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="ComBact-0.8")
-    parser.add_argument("-i", "--input-file", metavar="INPUT_FILE", required=True, 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--input-file", metavar="INPUT_FILE", required=True,
         help="XML blast alignment")
-    parser.add_argument("-o", "--output-dir", metavar="OUTPUT_DIRECTORY",required=True, 
+    parser.add_argument("-o", "--output-dir", metavar="OUTPUT_DIRECTORY",required=True,
         help="output directory containing three tsv files")
-    parser.add_argument("-l", "--list", metavar="GENOMES_LIST", required=True, 
+    parser.add_argument("-l", "--list", metavar="GENOMES_LIST", required=True,
         help="list of genome alignments to be parsed")
     parser.add_argument("-L", "--length", metavar="LENGTH_CUTOFF", default=0,
         type=float, dest="len_cutoff",
@@ -146,14 +143,14 @@ def main(argv=None):
         help="minimum identity (as percentage of query matches) to report mutations [default=0]")
     parser.add_argument("--silent-mut", action="store_true",
         help="report silent mutations")
+    parser.add_argument("-v", "--version", action="version", version="%(prog)s 0.8")
 
     args = parser.parse_args(argv)
 
     start = time.time()
     print("Skip alignments below following thresholds:\n",
-          "\tidentity < {id}%\n",
-          "\tlength   < {len}%".format(
-        id=args.id_cutoff, len=args.len_cutoff))
+          "\tidentity < {id}%\n".format(id=args.id_cutoff),
+          "\tlength   < {len}%".format(len=args.len_cutoff))
     print("Reporting silent mutations: {}".format(args.silent_mut))
 
     print("\nComBact, current time:", time.strftime("%d/%m/%y %H:%M:%S"))
@@ -206,9 +203,9 @@ def main(argv=None):
 
                 # wild-type
                 if (q_len == align_len and identity == 100):
-                    full_hits[sbjct]  = "WT"
-                    nucl_hits[sbjct]  = "WT"
-                    amino_hits[sbjct] = "WT"
+                    full_hits[sbjct]  = "wt"
+                    nucl_hits[sbjct]  = "wt"
+                    amino_hits[sbjct] = "wt"
 
                 # SNP
                 elif (q_len == align_len and gaps == 0 and identity > args.id_cutoff):
@@ -241,10 +238,10 @@ def main(argv=None):
                     nucl_hits[sbjct]  = "c.[{}]".format(";".join(indels))
                     amino_hits[sbjct] = "indels"
 
-                # fragment WT
+                # fragment wt
                 elif ((q_start > 1 or q_end < q_len) and identity == 100 and
                       align_len/q_len*100 > args.len_cutoff):
-                    frag = "WT({}:{})".format(q_start, q_end)
+                    frag = "wt({}:{})".format(q_start, q_end)
                     full_hits[sbjct]  = frag
                     nucl_hits[sbjct]  = frag
                     amino_hits[sbjct] = frag
